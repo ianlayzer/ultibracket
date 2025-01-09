@@ -1,5 +1,5 @@
 import { Container } from 'react-bootstrap';
-import Navbar from '../components/NavBar';
+import Navbar from '../components/Navbar';
 
 const NotFoundPage = () => {
   return (
