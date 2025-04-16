@@ -1,14 +1,13 @@
 import { Container } from 'react-bootstrap';
 import Navbar from '../components/Navbar';
 
-const HomePage = () => {
+const TournamentsListPage = () => {
   return (
     <Container>
       <Navbar />
-      <h1>UltiBracket</h1>
-      <p>A billion dollar business coming soon.</p>
+      <h1>Tournaments</h1>
     </Container>
   );
 };
 
-export default HomePage;
+export default TournamentsListPage;

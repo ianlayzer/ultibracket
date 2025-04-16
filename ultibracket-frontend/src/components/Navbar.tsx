@@ -8,13 +8,14 @@ const Navbar = () => {
       <BsNavbar.Brand as={Link} to="/">
         Home
       </BsNavbar.Brand>
-      <BsNavbar.Collapse id="basic-navbar-nav">
-        <Nav>
-          <Nav.Link as={Link} to="/about">
-            About
-          </Nav.Link>
-        </Nav>
-      </BsNavbar.Collapse>
+      <Nav>
+        <Nav.Link as={Link} to="/tournaments">
+          Tournaments
+        </Nav.Link>
+        <Nav.Link as={Link} to="/about">
+          About
+        </Nav.Link>
+      </Nav>
     </BsNavbar>
   );
 };
