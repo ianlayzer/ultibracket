@@ -4,7 +4,10 @@ import { auth } from '../firebase/firebase';
 export const handleGoogleLogin = async () => {
   const provider = new GoogleAuthProvider();
   try {
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    if (result.user) {
+      window.location.reload();
+    }
   } catch (err: unknown) {
     if (err instanceof Error) {
       console.log(err.message);

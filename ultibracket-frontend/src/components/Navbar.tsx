@@ -1,16 +1,10 @@
-import { auth } from '../firebase/firebase';
-import { signOut } from 'firebase/auth';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../firebase/useAuth';
 import { handleGoogleLogin } from '../firebase/handleGoogleLogin';
-import { Button } from 'react-bootstrap';
+import { handleGoogleLogout } from '../firebase/handleGoogleLogout';
 
 const Navbar = () => {
   const { user } = useAuth();
-
-  const handleLogout = async () => {
-    await signOut(auth);
-  };
 
   return (
     <nav className="navbar">
@@ -31,7 +25,7 @@ const Navbar = () => {
           <li>
             <span>{user.displayName || user.email} </span>
             <span
-              onClick={handleLogout}
+              onClick={handleGoogleLogout}
               style={{
                 cursor: 'pointer',
                 color: 'blue',

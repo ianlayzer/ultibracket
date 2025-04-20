@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from '../firebase/firebase';
-import { useNavigate } from 'react-router-dom';
 import { ref, set, get } from 'firebase/database';
+import { onAuthStateChanged } from 'firebase/auth';
 
 function PredictionPage() {
   const [prediction, setPrediction] = useState('');
@@ -9,35 +9,42 @@ function PredictionPage() {
     null,
   );
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
-    const fetchPrediction = async () => {
-      try {
-        const user = auth.currentUser;
-        if (user) {
-          // Use the same structure for fetching as you do for storing
-          const userPredictionRef = ref(db, `predictions/${user.uid}`);
-          const snapshot = await get(userPredictionRef);
-
-          if (snapshot.exists()) {
-            setExistingPrediction(snapshot.val());
-            console.log('Prediction fetched:', snapshot.val());
-          } else {
-            console.log('No prediction found');
-          }
-        } else {
-          navigate('/login');
-        }
-      } catch (error) {
-        console.error('Error fetching prediction:', error);
-      } finally {
+    // Set up auth state observer
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setLoggedIn(true);
+        fetchPrediction(user.uid);
+      } else {
+        setLoggedIn(false);
         setLoading(false);
       }
-    };
+    });
 
-    fetchPrediction();
-  }, [navigate]);
+    // Cleanup function
+    return () => unsubscribe();
+  }, []);
+
+  // Separate the fetch function to be called after auth state changes
+  const fetchPrediction = async (userId: string) => {
+    try {
+      const userPredictionRef = ref(db, `predictions/${userId}`);
+      const snapshot = await get(userPredictionRef);
+
+      if (snapshot.exists()) {
+        setExistingPrediction(snapshot.val());
+        console.log('Prediction fetched:', snapshot.val());
+      } else {
+        console.log('No prediction found');
+      }
+    } catch (error) {
+      console.error('Error fetching prediction:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPrediction(e.target.value);
@@ -62,6 +69,10 @@ function PredictionPage() {
 
   if (loading) {
     return <p>Loading...</p>;
+  }
+
+  if (!loggedIn) {
+    return <p>Log in to see this page</p>;
   }
 
   return (
