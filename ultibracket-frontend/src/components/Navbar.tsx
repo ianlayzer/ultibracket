@@ -24,6 +24,9 @@ const Navbar = () => {
         <li>
           <Link to="/my-bracket">My Bracket</Link>
         </li>
+        <li>
+          <Link to="/prediction">Prediction</Link>
+        </li>
         {user ? (
           <li>
             <span>{user.displayName || user.email} </span>

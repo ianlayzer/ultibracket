@@ -5,6 +5,7 @@ import MyBracketPage from './pages/MyBracketPage';
 import NotFoundPage from './pages/NotFoundPage';
 import Navbar from './components/Navbar';
 import './App.css';
+import PredictionPage from './pages/PredictionPage';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
             <Route path="/" element={<LeaderboardPage />} />
             <Route path="/groups" element={<GroupsPage />} />
             <Route path="/my-bracket" element={<MyBracketPage />} />
+            <Route path="/prediction" element={<PredictionPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </div>
