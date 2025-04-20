@@ -6,7 +6,7 @@ const AboutPage = () => {
     <Container>
       <Navbar />
       <h1>About</h1>
-      <p>Hi! My name is Ian. I am a happily mediocre frisbee player.</p>
+      <p>Hi! My name is Ian. I am the greatest frisbee player ever.</p>
     </Container>
   );
 };
