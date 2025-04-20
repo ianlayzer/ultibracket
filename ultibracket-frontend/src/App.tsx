@@ -3,26 +3,14 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import GroupsPage from './pages/GroupsPage';
 import MyBracketPage from './pages/MyBracketPage';
 import NotFoundPage from './pages/NotFoundPage';
+import Navbar from './components/Navbar';
 import './App.css';
 
 function App() {
   return (
     <Router>
       <div className="app-container">
-        <nav className="navbar">
-          <ul className="nav-tabs">
-            <li>
-              <Link to="/">Leaderboard</Link>
-            </li>
-            <li>
-              <Link to="/groups">Groups</Link>
-            </li>
-            <li>
-              <Link to="/my-bracket">My Bracket</Link>
-            </li>
-          </ul>
-        </nav>
-
+        <Navbar />
         <div className="page-content">
           <Routes>
             <Route path="/" element={<LeaderboardPage />} />
