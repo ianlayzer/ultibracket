@@ -40,3 +40,8 @@ export type Tournament = {
   eliminationRounds: EliminationRound[];
   champion?: Team;
 };
+
+export type Record = {
+  wins: number;
+  losses: number;
+};

@@ -3,7 +3,6 @@ import { signOut } from 'firebase/auth';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../firebase/useAuth';
 import { handleGoogleLogin } from '../firebase/handleGoogleLogin';
-import { Button } from 'react-bootstrap';
 
 const Navbar = () => {
   const { user } = useAuth();

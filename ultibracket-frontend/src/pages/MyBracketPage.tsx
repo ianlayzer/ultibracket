@@ -1,4 +1,6 @@
+import TournamentView from '../components/Tournament';
+
 function MyBracketPage() {
-  return <h2>🧩 My Bracket</h2>;
+  return <TournamentView />;
 }
 export default MyBracketPage;

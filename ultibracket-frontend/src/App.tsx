@@ -4,8 +4,10 @@ import GroupsPage from './pages/GroupsPage';
 import MyBracketPage from './pages/MyBracketPage';
 import NotFoundPage from './pages/NotFoundPage';
 import Navbar from './components/Navbar';
-import './App.css';
 import PredictionPage from './pages/PredictionPage';
+
+import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
   return (
