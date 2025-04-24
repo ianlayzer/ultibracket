@@ -1,0 +1,220 @@
+.bracket-container {
+  width: 100%;
+  overflow-x: auto;
+  padding: 20px 0;
+}
+
+.bracket-headers {
+  margin-bottom: 20px;
+}
+
+.bracket-body {
+  display: flex;
+  justify-content: space-between;
+  min-height: 700px;
+}
+
+.bracket-round {
+  display: flex;
+  flex-direction: column;
+  width: 24%;
+  position: relative;
+}
+
+.bracket-game {
+  margin-bottom: 2px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: 90%;
+}
+
+.bracket-team {
+  padding: 8px 12px;
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-bottom: none;
+}
+
+.bracket-team:last-child {
+  border-bottom: 1px solid #dee2e6;
+}
+
+.bracket-team.winner {
+  background-color: rgba(40, 167, 69, 0.2);
+  font-weight: bold;
+}
+
+.bracket-team.loser {
+  background-color: rgba(220, 53, 69, 0.2);
+  color: #6c757d;
+}
+
+.seed-badge {
+  text-align: center;
+}
+
+.team-name {
+  font-size: 14px;
+}
+
+.score {
+  font-weight: 600;
+}
+
+/* Fixed positioning for each matchup to ensure alignment */
+.bracket-game-wrapper {
+  position: absolute;
+  width: 100%;
+}
+
+/* Pre-quarters positioning - 8 games */
+.prequarter-game:nth-child(1) {
+  top: 0%;
+}
+.prequarter-game:nth-child(2) {
+  top: 12.5%;
+}
+.prequarter-game:nth-child(3) {
+  top: 25%;
+}
+.prequarter-game:nth-child(4) {
+  top: 37.5%;
+}
+.prequarter-game:nth-child(5) {
+  top: 50%;
+}
+.prequarter-game:nth-child(6) {
+  top: 62.5%;
+}
+.prequarter-game:nth-child(7) {
+  top: 75%;
+}
+.prequarter-game:nth-child(8) {
+  top: 87.5%;
+}
+
+/* Quarterfinals positioning - 4 games that align with pre-quarters winners */
+.quarter-game:nth-child(1) {
+  top: 6.25%; /* Aligned between 1st and 2nd prequarter games */
+}
+.quarter-game:nth-child(2) {
+  top: 31.25%; /* Aligned between 3rd and 4th prequarter games */
+}
+.quarter-game:nth-child(3) {
+  top: 56.25%; /* Aligned between 5th and 6th prequarter games */
+}
+.quarter-game:nth-child(4) {
+  top: 81.25%; /* Aligned between 7th and 8th prequarter games */
+}
+
+/* Semifinals positioning - 2 games that align with quarterfinals winners */
+.semi-game:nth-child(1) {
+  top: 18.75%; /* Aligned between 1st and 2nd quarter games */
+}
+.semi-game:nth-child(2) {
+  top: 68.75%; /* Aligned between 3rd and 4th quarter games */
+}
+
+/* Finals positioning - centered between semifinals */
+.final-game {
+  top: 43.75%; /* Centered between the two semifinals */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .bracket-container {
+    overflow-x: scroll;
+  }
+
+  .bracket-body {
+    min-width: 800px;
+  }
+}
+
+/* Add this class to your main component to ensure proper height */
+.tournament-bracket-container {
+  min-height: 700px;
+}
+
+/* Style for teams that advanced */
+tr.winner {
+  background-color: rgba(40, 167, 69, 0.1) !important;
+  font-weight: 500;
+}
+
+/* Ensure this overrides Bootstrap's striping */
+.table-striped tbody tr.winner:nth-of-type(odd),
+.table-striped tbody tr.winner:nth-of-type(even) {
+  background-color: rgba(40, 167, 69, 0.1) !important;
+}
+
+/* Class for the custom background that was previously used */
+.bg-light-success {
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+/* Pool team styles */
+.pool-teams-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.pool-team-item {
+  padding: 10px 15px;
+  border-bottom: 1px solid #dee2e6;
+  transition: background-color 0.2s;
+}
+
+.pool-team-item:last-child {
+  border-bottom: none;
+}
+
+/* Teams that advanced styling - matches the bracket winner style */
+.pool-team-advanced {
+  background-color: rgba(40, 167, 69, 0.1);
+  font-weight: 500;
+}
+
+.team-info {
+  display: flex;
+  align-items: center;
+}
+
+.seed-badge {
+  margin-right: 8px;
+  min-width: 28px;
+  text-align: center;
+}
+
+.team-name {
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+.team-record {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Pool card styles */
+.pool-card {
+  height: 100%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* To prepare for drag-and-drop functionality later */
+.pool-team-item.draggable {
+  cursor: grab;
+}
+
+.pool-team-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.pool-team-item.drop-target {
+  border: 2px dashed #0d6efd;
+}
