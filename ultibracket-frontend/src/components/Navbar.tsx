@@ -12,15 +12,19 @@ const Navbar = () => {
         <li>
           <Link to="/">Leaderboard</Link>
         </li>
-        <li>
-          <Link to="/groups">Groups</Link>
-        </li>
-        <li>
-          <Link to="/my-bracket">My Bracket</Link>
-        </li>
-        <li>
-          <Link to="/prediction">Prediction</Link>
-        </li>
+        {user ? (
+          <>
+            <li>
+              <Link to="/groups">My Groups</Link>
+            </li>
+            <li>
+              <Link to="/my-bracket">My Bracket</Link>
+            </li>
+            <li>
+              <Link to="/prediction">Prediction</Link>
+            </li>
+          </>
+        ) : null}
         {user ? (
           <li>
             <span>{user.displayName || user.email} </span>
