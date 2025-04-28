@@ -1,6 +1,17 @@
-import { Card, Badge, Container, Row, Col, Button } from 'react-bootstrap';
+import {
+  Card,
+  Badge,
+  Container,
+  Row,
+  Col,
+  Button,
+  Spinner,
+  Toast,
+  ToastContainer,
+} from 'react-bootstrap';
 import { useState, useEffect, useRef } from 'react';
 import './Tournament.css';
+import { saveTournament } from './../firebase/FirebaseUtils'; // Import our Firebase utility
 
 // Type definitions
 interface Team {
@@ -253,12 +264,28 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   } | null>(null);
   const [bracket, setBracket] = useState<Tournament['bracket'] | null>(null);
   const [bracketGenerated, setBracketGenerated] = useState<boolean>(false);
+  const [isBracketComplete, setIsBracketComplete] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [tournamentId, setTournamentId] = useState<string | null>(null);
 
   useEffect(() => {
     // Generate tournament data when teams change
     setTournamentData(createTournamentData(teams));
     setBracketGenerated(false);
+    setIsBracketComplete(false);
   }, [teams]);
+
+  // Check if bracket is complete (final winner is selected)
+  useEffect(() => {
+    if (tournamentData && bracketGenerated) {
+      const finalGame = tournamentData.bracket.final[0];
+      setIsBracketComplete(finalGame.winner !== null);
+    } else {
+      setIsBracketComplete(false);
+    }
+  }, [tournamentData, bracketGenerated]);
 
   if (!tournamentData) {
     return <div>Loading tournament data...</div>;
@@ -379,6 +406,28 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     }
 
     setTournamentData(newTournamentData);
+  };
+
+  // Function to save the tournament to Firebase
+  const handleSaveTournament = async () => {
+    console.log('trying to save tournament in Tournament.tsx');
+    if (!isBracketComplete || !tournamentData) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+    console.log('up to the try');
+
+    try {
+      const id = await saveTournament(tournamentData);
+      setTournamentId(id);
+      setShowSaveToast(true);
+    } catch (error) {
+      console.error('Error saving tournament:', error);
+      setSaveError('Failed to save tournament. Please try again.');
+      setShowSaveToast(true);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderPoolStandings = () => {
@@ -543,8 +592,35 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         </div>
 
         {bracketGenerated && (
-          <div className="text-center mt-4 text-muted">
-            <p>Click on a team to advance them to the next round.</p>
+          <div className="text-center mt-4">
+            <p className="text-muted mb-3">
+              Click on a team to advance them to the next round.
+            </p>
+
+            {/* Save tournament button - only enabled when bracket is complete */}
+            <Button
+              variant="success"
+              size="lg"
+              onClick={handleSaveTournament}
+              disabled={!isBracketComplete || isSaving}
+              className="mt-3"
+            >
+              {isSaving ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Saving...
+                </>
+              ) : (
+                'Save Tournament'
+              )}
+            </Button>
+
+            {isBracketComplete && (
+              <p className="text-success mt-2">
+                Tournament complete! Champion:{' '}
+                {getTeamName(tournamentData.bracket.final[0].winner!)}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -587,6 +663,33 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         </div>
         {renderBracket()}
       </div>
+
+      {/* Toast notification for save success/failure */}
+      <ToastContainer position="bottom-end" className="p-3">
+        <Toast
+          onClose={() => setShowSaveToast(false)}
+          show={showSaveToast}
+          delay={5000}
+          autohide
+          bg={saveError ? 'danger' : 'success'}
+        >
+          <Toast.Header>
+            <strong className="me-auto">
+              {saveError ? 'Error' : 'Success'}
+            </strong>
+          </Toast.Header>
+          <Toast.Body className="text-white">
+            {saveError ? (
+              saveError
+            ) : (
+              <>
+                Tournament saved successfully! ID:{' '}
+                <strong>{tournamentId}</strong>
+              </>
+            )}
+          </Toast.Body>
+        </Toast>
+      </ToastContainer>
     </Container>
   );
 };
