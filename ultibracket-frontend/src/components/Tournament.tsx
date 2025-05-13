@@ -9,7 +9,7 @@ import {
   Toast,
   ToastContainer,
 } from 'react-bootstrap';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import './Tournament.css';
 import { saveTournament } from './../firebase/FirebaseUtils'; // Import our Firebase utility
 
@@ -262,7 +262,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     poolName: string;
     index: number;
   } | null>(null);
-  const [bracket, setBracket] = useState<Tournament['bracket'] | null>(null);
   const [bracketGenerated, setBracketGenerated] = useState<boolean>(false);
   const [isBracketComplete, setIsBracketComplete] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -410,12 +409,10 @@ const TournamentView: React.FC<TournamentViewProps> = ({
 
   // Function to save the tournament to Firebase
   const handleSaveTournament = async () => {
-    console.log('trying to save tournament in Tournament.tsx');
     if (!isBracketComplete || !tournamentData) return;
 
     setIsSaving(true);
     setSaveError(null);
-    console.log('up to the try');
 
     try {
       const id = await saveTournament(tournamentData);

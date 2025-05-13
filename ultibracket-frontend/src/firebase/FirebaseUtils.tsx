@@ -27,11 +27,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // Type definitions (matching our Tournament component)
-interface Team {
-  name: string;
-  seed: number;
-}
-
 interface PoolTeam {
   team: string;
   wins: number;
@@ -70,7 +65,6 @@ interface Tournament {
 export const saveTournament = async (
   tournamentData: Tournament,
 ): Promise<string> => {
-  console.log('trying to save tournament in utils');
   try {
     // Add timestamp and get champion from final game
     const finalGame = tournamentData.bracket.final[0];
@@ -87,7 +81,6 @@ export const saveTournament = async (
     const tournamentRef = doc(db, 'tournaments', tournamentId);
     await setDoc(tournamentRef, updatedData);
 
-    console.log('Tournament saved successfully with ID:', tournamentId);
     return tournamentId;
   } catch (error) {
     console.error('Error saving tournament:', error);
