@@ -409,6 +409,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
 
   // Function to save the tournament to Firebase
   const handleSaveTournament = async () => {
+    console.log('trying to save tournament in Tournament.tsx');
     if (!isBracketComplete || !tournamentData) return;
 
     setIsSaving(true);

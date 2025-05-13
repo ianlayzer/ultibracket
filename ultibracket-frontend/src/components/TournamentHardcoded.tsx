@@ -1,6 +1,14 @@
-import { Table, Card, Badge, Container, Row, Col } from 'react-bootstrap';
+import { Card, Badge, Container, Row, Col } from 'react-bootstrap';
 
 import './Tournament.css';
+
+interface Game {
+  id: number;
+  team1: string;
+  team2: string;
+  score: string;
+  winner: string;
+}
 
 // Sample data based on the provided tournament results
 const tournamentData = {
@@ -300,7 +308,7 @@ const TournamentView = () => {
     );
   };
 
-  const BracketGame = ({ game, isLeft = true }) => {
+  const BracketGame = ({ game }: { game: Game }) => {
     const team1 = getTeamName(game.team1);
     const team2 = getTeamName(game.team2);
     const seed1 = getSeed(game.team1);
