@@ -1,4 +1,3 @@
-// firebaseUtils.ts
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
@@ -7,7 +6,9 @@ import {
   collection,
   getDoc,
   getDocs,
-  serverTimestamp, // Import serverTimestamp
+  serverTimestamp,
+  query,
+  where,
 } from 'firebase/firestore';
 
 // Firebase configuration
@@ -77,6 +78,41 @@ const slugify = (text: string) => {
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^\w-]+/g, '');
+};
+
+/**
+ * Get all user bracket picks for a specific base tournament.
+ * @param baseTournamentName The name of the base tournament.
+ * @returns Promise with array of UserBracketPicks data.
+ */
+export const getAllUserBracketsForTournament = async (
+  baseTournamentName: string,
+): Promise<UserBracketPicks[]> => {
+  try {
+    if (!baseTournamentName) {
+      console.warn(
+        'Base tournament name is required to fetch user brackets for leaderboard.',
+      );
+      return [];
+    }
+    const userBracketsRef = collection(db, 'userBrackets');
+    // Create a query against the collection.
+    const q = query(
+      userBracketsRef,
+      where('baseTournamentName', '==', baseTournamentName),
+    );
+
+    const querySnapshot = await getDocs(q);
+    const brackets: UserBracketPicks[] = [];
+    querySnapshot.forEach((doc) => {
+      // Assuming UserBracketPicks includes userId, baseTournamentName, userBracketName, tournamentData
+      brackets.push(doc.data() as UserBracketPicks);
+    });
+    return brackets;
+  } catch (error) {
+    console.error('Error getting all user brackets for tournament:', error);
+    throw error;
+  }
 };
 
 /**

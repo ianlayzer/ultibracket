@@ -252,18 +252,18 @@ const MAX_POSSIBLE_POINTS =
   1 * POINTS_PER_ROUND.final;
 
 interface TournamentViewProps {
-  teams?: Team[];
-  baseTournamentName?: string; // Name of the overall tournament event
-  user: {
-    // User information
-    email: string;
-    uid: string;
-  };
+  teams?: Team[]; // Default teams to initialize with if no saved data
+  baseTournamentName?: string; // Default base tournament name
+  viewOnlyUserId?: string; // If provided, loads this user's bracket in read-only mode
+  viewOnlyTournamentName?: string; // The specific tournament name for the view-only bracket
 }
 
 const TournamentView: React.FC<TournamentViewProps> = ({
   teams = defaultTeams,
-  baseTournamentName = 'USA Ultimate College Nationals 2025', // Default base name
+  baseTournamentName:
+    propBaseTournamentName = 'USA Ultimate College Nationals 2025',
+  viewOnlyUserId,
+  viewOnlyTournamentName,
 }) => {
   const { user } = useAuth();
   const [tournamentData, setTournamentData] =
@@ -280,7 +280,14 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isEditing, setIsEditing] = useState<boolean>(true); // Start in edit mode or based on loaded data
+  const [isEditing, setIsEditing] = useState<boolean>(!viewOnlyUserId); // Start in view mode if viewOnlyUserId is present
+  const [errorLoading, setErrorLoading] = useState<string | null>(null);
+
+  const effectiveUserId = viewOnlyUserId || user?.uid;
+  const effectiveBaseTournamentName =
+    viewOnlyTournamentName || propBaseTournamentName;
+  const isViewingSomeoneElse =
+    !!viewOnlyUserId && (!user || viewOnlyUserId !== user.uid);
 
   const [countdown, setCountdown] = useState<string>('');
   const [isLocked, setIsLocked] = useState<boolean>(false);
@@ -293,42 +300,75 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   useEffect(() => {
     const initialize = async () => {
       setIsLoading(true);
-      if (!user || !user.uid) {
-        console.error('User not provided or incomplete.');
-        setTournamentData(createTournamentData(teams, baseTournamentName));
-        setUserBracketName(`${user?.email || 'My'}'s Bracket`);
-        setIsEditing(true);
+      setErrorLoading(null);
+
+      // Editing is disabled if viewing someone else, or if the bracket is locked
+      const canEverEdit =
+        user?.uid &&
+        (!viewOnlyUserId || viewOnlyUserId === user.uid) &&
+        !isLocked;
+      // Initial editing state: if it's own bracket, not locked, and no data loaded yet, allow edit. Otherwise view.
+      // This will be refined based on loaded data.
+
+      if (!effectiveUserId || !effectiveBaseTournamentName) {
+        setErrorLoading(
+          'Required information (user or tournament) is missing to display the bracket.',
+        );
         setIsLoading(false);
+        setTournamentData(null); // Explicitly set to null
         return;
       }
 
       try {
         const savedUserPicks = await getUserBracketPicks(
-          user.uid,
-          baseTournamentName,
+          effectiveUserId,
+          effectiveBaseTournamentName,
         );
         if (savedUserPicks) {
           setTournamentData(savedUserPicks.tournamentData);
           setUserBracketName(savedUserPicks.userBracketName);
           setBracketGeneratedFromPools(true); // Assume if saved, pools were processed
-          setIsEditing(false); // Start in view mode if data is loaded
+          setIsEditing(false); // Start in view mode when data is loaded
         } else {
-          // No saved data, initialize new
-          setTournamentData(createTournamentData(teams, baseTournamentName));
-          setUserBracketName(`${user.email}'s Bracket`);
-          setIsEditing(true);
+          if (isViewingSomeoneElse) {
+            setErrorLoading(`Bracket not found for the specified user.`);
+            setTournamentData(null);
+          } else if (user?.uid === effectiveUserId && !isLocked) {
+            // Own bracket, not found, not locked
+            setTournamentData(
+              createTournamentData(teams, effectiveBaseTournamentName),
+            );
+            setUserBracketName(`${user.email}'s Bracket`);
+            setIsEditing(true); // Allow editing for a new bracket
+            setBracketGeneratedFromPools(false);
+          } else {
+            // Own bracket, not found, but locked or no user
+            setErrorLoading('Cannot create new bracket (locked or no user).');
+            setTournamentData(
+              createTournamentData(teams, effectiveBaseTournamentName),
+            ); // Show empty structure
+            setIsEditing(false);
+          }
         }
       } catch (error) {
         console.error('Error loading user bracket:', error);
-        setTournamentData(createTournamentData(teams, baseTournamentName));
-        setUserBracketName(`${user.email}'s Bracket`);
-        setIsEditing(true);
+        setErrorLoading(
+          `Failed to load bracket data. ${(error as Error).message}`,
+        );
+        setTournamentData(null);
       } finally {
         setIsLoading(false);
       }
     };
     initialize();
-  }, [teams, baseTournamentName, user]);
+  }, [
+    teams,
+    propBaseTournamentName,
+    user,
+    viewOnlyUserId,
+    viewOnlyTournamentName,
+    isLocked,
+  ]); // Add isLocked to deps
 
   // Countdown Timer Logic
   useEffect(() => {
@@ -401,13 +441,48 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     }
   }, [tournamentData]);
 
-  if (isLoading || !tournamentData) {
+  if (isLoading) {
     return (
       <Container className="text-center mt-5">
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </Spinner>
-        <p>Loading tournament data...</p>
+        <Spinner animation="border" />
+        <p>Loading Bracket...</p>
+      </Container>
+    );
+  }
+  if (errorLoading) {
+    return (
+      <Container className="mt-4">
+        <Alert variant="danger">{errorLoading}</Alert>
+      </Container>
+    );
+  }
+  if (!tournamentData && !isEditing) {
+    // If no data could be loaded and not in a state to create new
+    return (
+      <Container className="mt-4">
+        <Alert variant="warning">Bracket data is unavailable.</Alert>
+      </Container>
+    );
+  }
+  // Ensure tournamentData exists before trying to access its properties
+  if (!tournamentData) {
+    // This case should ideally be handled by isLoading or errorLoading,
+    // but as a fallback if an editable new bracket is being initialized
+    if (isEditing && user && !isViewingSomeoneElse) {
+      // This path should be covered by the initialize logic that calls createTournamentData
+      // If somehow tournamentData is still null here, it's an issue in initialization
+      return (
+        <Container className="text-center mt-5">
+          <Spinner animation="border" />
+          <p>Initializing new bracket...</p>
+        </Container>
+      );
+    }
+    return (
+      <Container className="mt-4">
+        <Alert variant="danger">
+          Critical error: Bracket data could not be initialized.
+        </Alert>
       </Container>
     );
   }
@@ -705,14 +780,20 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                       key={index}
                       className={`pool-team-item ${team.advanced ? 'pool-team-advanced' : ''}`}
                       draggable={
-                        isEditing && !isLocked && !bracketGeneratedFromPools
+                        isEditing &&
+                        !isLocked &&
+                        !bracketGeneratedFromPools &&
+                        !isViewingSomeoneElse
                       }
                       onDragStart={() => handleDragStart(poolName, index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(poolName, index)}
                       style={{
                         cursor:
-                          isEditing && !isLocked && !bracketGeneratedFromPools
+                          isEditing &&
+                          !isLocked &&
+                          !bracketGeneratedFromPools &&
+                          !isViewingSomeoneElse
                             ? 'grab'
                             : 'default',
                       }}
@@ -766,7 +847,11 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     const seed2 = getSeed(game.team2);
     const isWinner1 = game.winner === game.team1 && game.team1 !== 'TBD';
     const isWinner2 = game.winner === game.team2 && game.team2 !== 'TBD';
-    const clickable = isEditing && !isLocked && bracketGeneratedFromPools;
+    const clickable =
+      isEditing &&
+      !isLocked &&
+      bracketGeneratedFromPools &&
+      !isViewingSomeoneElse;
 
     return (
       <div className="bracket-game mb-4">
@@ -832,7 +917,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       )}
       {isBracketComplete && !isEditing && (
         <Alert variant="success" className="text-center mt-3">
-          Your bracket is complete! Champion:{' '}
+          {!isViewingSomeoneElse ? 'Your bracket is complete!' : ''}
+          Champion:{' '}
           <strong>
             {getTeamName(tournamentData.bracket.final[0].winner!)}
           </strong>
@@ -846,70 +932,84 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       <div className="bg-primary text-white py-3 mb-4 border rounded">
         <Container>
           <h2 className="text-center mb-0">{tournamentData.name}</h2>
-          {user && (
-            <p className="text-center mb-0 small">Viewing as: {user.email}</p>
+          {isViewingSomeoneElse && userBracketName && (
+            <p className="text-center mb-0 small">Viewing: {userBracketName}</p>
+          )}
+          {!isViewingSomeoneElse && user && (
+            <p className="text-center mb-0 small">My Bracket ({user.email})</p>
           )}
         </Container>
       </div>
 
       {/* Bracket Name and Edit/Save Controls */}
-      <Card className="mb-4">
-        <Card.Body>
-          <Row>
-            <Col md={isEditing ? 8 : 12}>
-              <Form.Group controlId="bracketName">
-                <Form.Label>Bracket Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={userBracketName}
-                  onChange={(e) => setUserBracketName(e.target.value)}
-                  readOnly={!isEditing || isLocked}
-                  placeholder="Enter a name for your bracket"
-                />
-              </Form.Group>
-            </Col>
-            {isEditing && !isLocked && (
-              <Col md={4} className="d-flex align-items-end">
-                <Button
-                  variant="success"
-                  onClick={handleSaveUserPicks}
-                  disabled={isSaving || !bracketGeneratedFromPools}
-                  className="w-100"
-                >
-                  {isSaving ? (
-                    <>
-                      <Spinner
-                        as="span"
-                        animation="border"
-                        size="sm"
-                        role="status"
-                        aria-hidden="true"
-                      />{' '}
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Picks & Bracket Name'
-                  )}
-                </Button>
+      {!isViewingSomeoneElse ? (
+        <Card className="mb-4">
+          <Card.Body>
+            <Row>
+              <Col md={isEditing ? 8 : 12}>
+                <Form.Group controlId="bracketName">
+                  <Form.Label>Bracket Name</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={userBracketName}
+                    onChange={(e) => setUserBracketName(e.target.value)}
+                    readOnly={!isEditing || isLocked}
+                    placeholder="Enter a name for your bracket"
+                  />
+                </Form.Group>
               </Col>
+              {isEditing && !isLocked && (
+                <Col md={4} className="d-flex align-items-end">
+                  <Button
+                    variant="success"
+                    onClick={handleSaveUserPicks}
+                    disabled={
+                      isSaving ||
+                      !bracketGeneratedFromPools ||
+                      isViewingSomeoneElse ||
+                      isLocked ||
+                      !isEditing
+                    }
+                    className="w-100"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Spinner
+                          as="span"
+                          animation="border"
+                          size="sm"
+                          role="status"
+                          aria-hidden="true"
+                        />{' '}
+                        Saving...
+                      </>
+                    ) : (
+                      'Save picks & bracket name'
+                    )}
+                  </Button>
+                </Col>
+              )}
+            </Row>
+            {!isEditing &&
+              !isLocked &&
+              !isViewingSomeoneElse &&
+              user?.uid === effectiveUserId && (
+                <Button
+                  variant="info"
+                  onClick={() => setIsEditing(true)}
+                  className="mt-3"
+                >
+                  Edit Bracket
+                </Button>
+              )}
+            {isLocked && !isViewingSomeoneElse && (
+              <Alert variant="warning" className="mt-3">
+                Bracket is locked. No more edits allowed.
+              </Alert>
             )}
-          </Row>
-          {!isEditing && !isLocked && (
-            <Button
-              variant="info"
-              onClick={() => setIsEditing(true)}
-              className="mt-3"
-            >
-              Edit Bracket
-            </Button>
-          )}
-          {isLocked && (
-            <Alert variant="warning" className="mt-3">
-              Bracket is locked. No more edits allowed.
-            </Alert>
-          )}
-        </Card.Body>
-      </Card>
+          </Card.Body>
+        </Card>
+      ) : null}
 
       {/* Countdown and Points */}
       <Row className="mb-4 text-center">
@@ -923,7 +1023,11 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         </Col>
         <Col md={4}>
           <Card bg="light">
-            <Card.Header>Your Current Bracket Score</Card.Header>
+            <Card.Header>
+              {isViewingSomeoneElse
+                ? 'Bracket Score'
+                : 'Your Current Bracket Score'}
+            </Card.Header>
             <Card.Body>
               <Card.Title>
                 {currentScore} / {MAX_POSSIBLE_POINTS}
@@ -945,19 +1049,23 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       <div className="bg-light py-3 mb-4 border rounded">
         <Container>
           <h3 className="text-center mb-0">Pool Play</h3>
-          {isEditing && !isLocked && !bracketGeneratedFromPools && (
-            <p className="text-center text-muted mt-2 mb-0">
-              Drag and drop teams to reorder within pools. Then, populate the
-              bracket.
-            </p>
-          )}
-          {(!isEditing || (isLocked && !bracketGeneratedFromPools)) && (
-            <p className="text-center text-muted mt-2 mb-0">
-              Pool rankings are set. Click "Edit Bracket" to make changes if not
-              locked.
-            </p>
-          )}
-          {bracketGeneratedFromPools && (
+          {isEditing &&
+            !isLocked &&
+            !bracketGeneratedFromPools &&
+            !isViewingSomeoneElse && (
+              <p className="text-center text-muted mt-2 mb-0">
+                Drag and drop teams to reorder within pools. Then, populate the
+                bracket.
+              </p>
+            )}
+          {(!isEditing || (isLocked && !bracketGeneratedFromPools)) &&
+            !isViewingSomeoneElse && (
+              <p className="text-center text-muted mt-2 mb-0">
+                Pool rankings are set. Click "Edit Bracket" to make changes if
+                not locked.
+              </p>
+            )}
+          {bracketGeneratedFromPools && !isViewingSomeoneElse && (
             <p className="text-center text-muted mt-2 mb-0">
               Pool rankings used to generate bracket. Edit pools by first
               resetting/clearing bracket or re-generate.

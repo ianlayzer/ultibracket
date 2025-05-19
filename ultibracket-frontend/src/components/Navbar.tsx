@@ -10,18 +10,12 @@ const Navbar = () => {
     <nav className="navbar">
       <ul className="nav-tabs">
         <li>
-          <Link to="/">Leaderboard</Link>
+          <Link to="/leaderboard">Leaderboard</Link>
         </li>
         {user ? (
           <>
             <li>
-              <Link to="/groups">My Groups</Link>
-            </li>
-            <li>
               <Link to="/my-bracket">My Bracket</Link>
-            </li>
-            <li>
-              <Link to="/prediction">Prediction</Link>
             </li>
           </>
         ) : null}

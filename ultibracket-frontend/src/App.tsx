@@ -1,5 +1,11 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom';
 import LeaderboardPage from './pages/LeaderboardPage';
+import BracketViewerPage from './pages/BracketViewerPage';
 import GroupsPage from './pages/GroupsPage';
 import MyBracketPage from './pages/MyBracketPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -8,20 +14,53 @@ import PredictionPage from './pages/PredictionPage';
 
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { auth } from './firebase/firebase';
 
 function App() {
+  const currentUser = auth;
+
   return (
     <Router>
       <div className="app-container">
         <Navbar />
         <div className="page-content">
           <Routes>
-            <Route path="/" element={<LeaderboardPage />} />
-            <Route path="/groups" element={<GroupsPage />} />
-            <Route path="/my-bracket" element={<MyBracketPage />} />
-            <Route path="/prediction" element={<PredictionPage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route
+              path="/leaderboard/:tournamentNameParam"
+              element={<LeaderboardPage />}
+            />
+            <Route
+              path="/brackets/:userId/:baseTournamentNameSlug"
+              element={<BracketViewerPage />}
+            />
+            <Route
+              path="/my-bracket"
+              element={
+                currentUser ? (
+                  <MyBracketPage />
+                ) : (
+                  <Navigate
+                    to="/login"
+                    replace
+                    state={{ message: 'Please log in to view your bracket.' }}
+                  />
+                )
+              }
+            />
+            <Route
+              path="/"
+              element={
+                currentUser ? (
+                  <Navigate to="/my-bracket" replace />
+                ) : (
+                  <LeaderboardPage /> // Or a welcome page
+                )
+              }
+            />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          <Routes></Routes>
         </div>
       </div>
     </Router>
