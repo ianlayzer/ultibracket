@@ -364,36 +364,38 @@ const TournamentView: React.FC<TournamentViewProps> = ({
 
   useEffect(() => {
     const calculateCountdown = () => {
-      const now = new Date();
-      let lockDate = new Date(now);
-      const currentDay = now.getDay();
-      const daysUntilFriday = (5 - currentDay + 7) % 7;
-      lockDate.setDate(now.getDate() + daysUntilFriday);
-      lockDate.setHours(5, 0, 0, 0);
-      if (
-        (now.getDay() === 5 && now.getTime() >= lockDate.getTime()) ||
-        now.getTime() >= lockDate.getTime()
-      ) {
-        lockDate.setDate(lockDate.getDate() + 7);
-      }
+      // Target date: Friday, May 23, 2025, 10:30 AM PDT (UTC-7)
+      // PDT is UTC-7. So, 10:30 AM PDT is 17:30 UTC.
+      const lockDate = new Date('2025-05-23T17:30:00Z'); // Target date in UTC
+
+      const now = new Date(); // Current time in user's local timezone
+
       const diff = lockDate.getTime() - now.getTime();
+
       if (diff <= 0) {
         setCountdown('Bracket Locked!');
         setIsLocked(true);
-        if (!isViewingSomeoneElse) setIsEditing(false);
+        // Only set isEditing to false if not viewing someone else's bracket
+        // and the current user could potentially edit.
+        if (!isViewingSomeoneElse) {
+          setIsEditing(false);
+        }
         return;
       }
+
       const d = Math.floor(diff / (1000 * 60 * 60 * 24));
       const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
       const m = Math.floor((diff / 1000 / 60) % 60);
       const s = Math.floor((diff / 1000) % 60);
       setCountdown(`${d}d ${h}h ${m}m ${s}s`);
-      setIsLocked(false);
+      setIsLocked(false); // Ensure isLocked is false if countdown is active
     };
-    calculateCountdown();
+
+    calculateCountdown(); // Initial call
     const intervalId = setInterval(calculateCountdown, 1000);
-    return () => clearInterval(intervalId);
-  }, [isViewingSomeoneElse]); // Added isViewingSomeoneElse dependency for setIsEditing
+
+    return () => clearInterval(intervalId); // Cleanup interval on component unmount
+  }, [isViewingSomeoneElse, setIsLocked, setCountdown, setIsEditing]); // Added setIsLocked, setCountdown, setIsEditing as dependencies because they are used in the effect
 
   useEffect(() => {
     if (tournamentData?.bracket) {
