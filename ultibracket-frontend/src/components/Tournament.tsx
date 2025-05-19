@@ -220,7 +220,7 @@ const createTournamentData = (teams: Team[]): Tournament => {
   const bracket = createEmptyBracket();
 
   return {
-    name: 'USA Ultimate College Nationals 2024',
+    name: 'USA Ultimate College Nationals 2025',
     pools,
     bracket,
   };
@@ -228,26 +228,26 @@ const createTournamentData = (teams: Team[]): Tournament => {
 
 // Default teams if none are provided
 const defaultTeams: Team[] = [
-  { name: 'North Carolina', seed: 1 },
-  { name: 'Georgia', seed: 2 },
-  { name: 'Massachusetts', seed: 3 },
-  { name: 'Colorado', seed: 4 },
-  { name: 'Cal Poly-SLO', seed: 5 },
-  { name: 'Pittsburgh', seed: 6 },
-  { name: 'Oregon', seed: 7 },
-  { name: 'Brown', seed: 8 },
-  { name: 'Vermont', seed: 9 },
-  { name: 'Minnesota', seed: 10 },
-  { name: 'Carleton College', seed: 11 },
+  { name: 'Massachusetts', seed: 1 },
+  { name: 'Oregon', seed: 2 },
+  { name: 'Colorado', seed: 3 },
+  { name: 'Carleton College', seed: 4 },
+  { name: 'North Carolina', seed: 5 },
+  { name: 'Cal Poly-SLO', seed: 6 },
+  { name: 'California-Santa Cruz', seed: 7 },
+  { name: 'Oregon State', seed: 8 },
+  { name: 'Washington University', seed: 9 },
+  { name: 'California', seed: 10 },
+  { name: 'Northeastern', seed: 11 },
   { name: 'Texas', seed: 12 },
-  { name: 'Alabama-Huntsville', seed: 13 },
-  { name: 'North Carolina State', seed: 14 },
-  { name: 'California', seed: 15 },
+  { name: 'Vermont', seed: 13 },
+  { name: 'Georgia', seed: 14 },
+  { name: 'British Columbia', seed: 15 },
   { name: 'Penn State', seed: 16 },
-  { name: 'Oregon State', seed: 17 },
-  { name: 'Washington University', seed: 18 },
-  { name: 'Ottawa', seed: 19 },
-  { name: 'Michigan', seed: 20 },
+  { name: 'Utah', seed: 17 },
+  { name: 'Western Washington', seed: 18 },
+  { name: 'Michigan', seed: 19 },
+  { name: 'Ottawa', seed: 20 },
 ];
 
 interface TournamentViewProps {
