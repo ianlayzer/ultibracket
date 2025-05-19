@@ -86,11 +86,9 @@ const createPools = (teams: Team[]): { [key: string]: PoolTeam[] } => {
   };
 
   if (sortedTeams.length < 20) {
-    // Handle cases with fewer than 20 teams if necessary, or ensure 20 teams are always provided
     console.warn(
       'Not enough teams to fill pools according to the defined structure.',
     );
-    // Fallback: simple distribution for fewer teams (example)
     const poolNames = Object.keys(pools);
     sortedTeams.forEach((team, index) => {
       pools[poolNames[index % poolNames.length]].push(createPoolTeam(team));
@@ -161,25 +159,32 @@ const createEmptyBracket = (): TournamentDisplayData['bracket'] => ({
 
 const populateBracketFromPools = (
   pools: { [key: string]: PoolTeam[] },
-  currentBracket?: TournamentDisplayData['bracket'],
+  // currentBracket?: TournamentDisplayData['bracket'], // We will always create a fresh bracket from pools
 ) => {
-  const newBracket = currentBracket
-    ? JSON.parse(JSON.stringify(currentBracket))
-    : createEmptyBracket();
+  const newBracket = createEmptyBracket(); // Always start with a fresh empty bracket
 
   const poolA = pools['Pool A']?.slice(0, 3) || [];
   const poolB = pools['Pool B']?.slice(0, 3) || [];
   const poolC = pools['Pool C']?.slice(0, 3) || [];
   const poolD = pools['Pool D']?.slice(0, 3) || [];
 
-  // Mark teams as advanced in pools (visual cue, actual advancement logic is in bracket population)
+  // Mark teams as advanced in pools (visual cue)
   Object.values(pools).forEach((poolTeams) => {
-    poolTeams.forEach((pt, index) => {
-      pt.advanced = index < 3; // Top 3 advance
-    });
+    poolTeams.forEach((pt) => (pt.advanced = false)); // Reset first
+  });
+  [...poolA, ...poolB, ...poolC, ...poolD].forEach((pt) => {
+    // Find the team in the original pools structure and mark it
+    for (const poolName in pools) {
+      const teamInPool = pools[poolName].find(
+        (poolTeam) => poolTeam.team === pt.team,
+      );
+      if (teamInPool) {
+        teamInPool.advanced = true;
+        break;
+      }
+    }
   });
 
-  // Ensure teams exist before assigning
   newBracket.quarters[0].team1 = poolA[0]?.team || 'TBD';
   newBracket.quarters[1].team1 = poolD[0]?.team || 'TBD';
   newBracket.quarters[2].team1 = poolC[0]?.team || 'TBD';
@@ -194,15 +199,6 @@ const populateBracketFromPools = (
   newBracket.prequarters[3].team1 = poolD[1]?.team || 'TBD';
   newBracket.prequarters[3].team2 = poolA[2]?.team || 'TBD';
 
-  // When bracket is populated from pools, subsequent round winners should be cleared
-  // if their feeder games changed. This is complex. For now, we assume user will re-click.
-  // Or, we can reset winners of games whose teams just got populated.
-  const resetDependentGames = (bracket: TournamentDisplayData['bracket']) => {
-    // Example: if prequarter teams change, reset quarter winners that depend on them.
-    // This logic would need to be carefully implemented if auto-clearing is desired.
-  };
-  // resetDependentGames(newBracket);
-
   return newBracket;
 };
 
@@ -211,7 +207,7 @@ const createTournamentData = (
   name: string,
 ): TournamentDisplayData => {
   const pools = createPools(teams);
-  const bracket = createEmptyBracket(); // Start with an empty bracket
+  const bracket = createEmptyBracket();
   return { name, pools, bracket };
 };
 
@@ -238,7 +234,6 @@ const defaultTeams: Team[] = [
   { name: 'Ottawa', seed: 20 },
 ];
 
-// Scoring configuration
 const POINTS_PER_ROUND = {
   prequarters: 10,
   quarters: 20,
@@ -252,10 +247,10 @@ const MAX_POSSIBLE_POINTS =
   1 * POINTS_PER_ROUND.final;
 
 interface TournamentViewProps {
-  teams?: Team[]; // Default teams to initialize with if no saved data
-  baseTournamentName?: string; // Default base tournament name
-  viewOnlyUserId?: string; // If provided, loads this user's bracket in read-only mode
-  viewOnlyTournamentName?: string; // The specific tournament name for the view-only bracket
+  teams?: Team[];
+  baseTournamentName?: string;
+  viewOnlyUserId?: string;
+  viewOnlyTournamentName?: string;
 }
 
 const TournamentView: React.FC<TournamentViewProps> = ({
@@ -280,7 +275,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isEditing, setIsEditing] = useState<boolean>(!viewOnlyUserId); // Start in view mode if viewOnlyUserId is present
+  const [isEditing, setIsEditing] = useState<boolean>(!viewOnlyUserId);
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
 
   const effectiveUserId = viewOnlyUserId || user?.uid;
@@ -296,29 +291,18 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   const [possiblePointsRemaining, setPossiblePointsRemaining] =
     useState<number>(MAX_POSSIBLE_POINTS);
 
-  // Initialize or load tournament data
   useEffect(() => {
     const initialize = async () => {
       setIsLoading(true);
       setErrorLoading(null);
-
-      // Editing is disabled if viewing someone else, or if the bracket is locked
-      const canEverEdit =
-        user?.uid &&
-        (!viewOnlyUserId || viewOnlyUserId === user.uid) &&
-        !isLocked;
-      // Initial editing state: if it's own bracket, not locked, and no data loaded yet, allow edit. Otherwise view.
-      // This will be refined based on loaded data.
-
       if (!effectiveUserId || !effectiveBaseTournamentName) {
         setErrorLoading(
           'Required information (user or tournament) is missing to display the bracket.',
         );
         setIsLoading(false);
-        setTournamentData(null); // Explicitly set to null
+        setTournamentData(null);
         return;
       }
-
       try {
         const savedUserPicks = await getUserBracketPicks(
           effectiveUserId,
@@ -327,26 +311,34 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         if (savedUserPicks) {
           setTournamentData(savedUserPicks.tournamentData);
           setUserBracketName(savedUserPicks.userBracketName);
-          setBracketGeneratedFromPools(true); // Assume if saved, pools were processed
-          setIsEditing(false); // Start in view mode when data is loaded
+          // Check if the loaded bracket has any teams beyond TBD, implying it was populated
+          const hasPicks =
+            savedUserPicks.tournamentData.bracket.prequarters.some(
+              (g) => g.team1 !== 'TBD',
+            ) ||
+            savedUserPicks.tournamentData.bracket.quarters.some(
+              (g) => g.team1 !== 'TBD',
+            );
+          setBracketGeneratedFromPools(hasPicks);
+          setIsEditing(false);
         } else {
           if (isViewingSomeoneElse) {
             setErrorLoading(`Bracket not found for the specified user.`);
             setTournamentData(null);
           } else if (user?.uid === effectiveUserId && !isLocked) {
-            // Own bracket, not found, not locked
-            setTournamentData(
-              createTournamentData(teams, effectiveBaseTournamentName),
+            const newTournament = createTournamentData(
+              teams,
+              effectiveBaseTournamentName,
             );
+            setTournamentData(newTournament);
             setUserBracketName(`${user.email}'s Bracket`);
-            setIsEditing(true); // Allow editing for a new bracket
+            setIsEditing(true);
             setBracketGeneratedFromPools(false);
           } else {
-            // Own bracket, not found, but locked or no user
             setErrorLoading('Cannot create new bracket (locked or no user).');
             setTournamentData(
               createTournamentData(teams, effectiveBaseTournamentName),
-            ); // Show empty structure
+            );
             setIsEditing(false);
           }
         }
@@ -368,37 +360,29 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     viewOnlyUserId,
     viewOnlyTournamentName,
     isLocked,
-  ]); // Add isLocked to deps
+  ]);
 
-  // Countdown Timer Logic
   useEffect(() => {
     const calculateCountdown = () => {
       const now = new Date();
       let lockDate = new Date(now);
-
-      // Find the next Friday
-      const currentDay = now.getDay(); // Sunday = 0, Friday = 5
+      const currentDay = now.getDay();
       const daysUntilFriday = (5 - currentDay + 7) % 7;
       lockDate.setDate(now.getDate() + daysUntilFriday);
-      lockDate.setHours(5, 0, 0, 0); // 5 AM
-
-      // If it's Friday and past 5 AM, set to next Friday
-      if (now.getDay() === 5 && now.getTime() >= lockDate.getTime()) {
-        lockDate.setDate(lockDate.getDate() + 7);
-      } else if (now.getTime() >= lockDate.getTime()) {
-        // If today is Sat/Sun and lockDate was for past Friday
+      lockDate.setHours(5, 0, 0, 0);
+      if (
+        (now.getDay() === 5 && now.getTime() >= lockDate.getTime()) ||
+        now.getTime() >= lockDate.getTime()
+      ) {
         lockDate.setDate(lockDate.getDate() + 7);
       }
-
       const diff = lockDate.getTime() - now.getTime();
-
       if (diff <= 0) {
         setCountdown('Bracket Locked!');
         setIsLocked(true);
-        setIsEditing(false); // Force view mode
+        if (!isViewingSomeoneElse) setIsEditing(false);
         return;
       }
-
       const d = Math.floor(diff / (1000 * 60 * 60 * 24));
       const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
       const m = Math.floor((diff / 1000 / 60) % 60);
@@ -406,13 +390,11 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       setCountdown(`${d}d ${h}h ${m}m ${s}s`);
       setIsLocked(false);
     };
-
-    calculateCountdown(); // Initial call
+    calculateCountdown();
     const intervalId = setInterval(calculateCountdown, 1000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isViewingSomeoneElse]); // Added isViewingSomeoneElse dependency for setIsEditing
 
-  // Calculate Score and Bracket Completion
   useEffect(() => {
     if (tournamentData?.bracket) {
       let score = 0;
@@ -424,14 +406,11 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       ];
       rounds.forEach((roundName) => {
         tournamentData.bracket[roundName].forEach((game) => {
-          if (game.winner) {
-            score += POINTS_PER_ROUND[roundName];
-          }
+          if (game.winner) score += POINTS_PER_ROUND[roundName];
         });
       });
       setCurrentScore(score);
       setPossiblePointsRemaining(MAX_POSSIBLE_POINTS - score);
-
       const finalGame = tournamentData.bracket.final[0];
       setIsBracketComplete(!!finalGame?.winner);
     } else {
@@ -457,20 +436,14 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     );
   }
   if (!tournamentData && !isEditing) {
-    // If no data could be loaded and not in a state to create new
     return (
       <Container className="mt-4">
         <Alert variant="warning">Bracket data is unavailable.</Alert>
       </Container>
     );
   }
-  // Ensure tournamentData exists before trying to access its properties
   if (!tournamentData) {
-    // This case should ideally be handled by isLoading or errorLoading,
-    // but as a fallback if an editable new bracket is being initialized
     if (isEditing && user && !isViewingSomeoneElse) {
-      // This path should be covered by the initialize logic that calls createTournamentData
-      // If somehow tournamentData is still null here, it's an issue in initialization
       return (
         <Container className="text-center mt-5">
           <Spinner animation="border" />
@@ -488,12 +461,12 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   }
 
   const handleDragStart = (poolName: string, index: number) => {
-    if (!isEditing || isLocked) return;
+    if (!isEditing || isLocked || isViewingSomeoneElse) return; // Allow drag if editing own bracket
     setDraggedTeam({ poolName, index });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    if (!isEditing || isLocked) return;
+    if (!isEditing || isLocked || isViewingSomeoneElse) return;
     e.preventDefault();
   };
 
@@ -501,6 +474,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     if (
       !isEditing ||
       isLocked ||
+      isViewingSomeoneElse ||
       !draggedTeam ||
       draggedTeam.poolName !== poolName
     ) {
@@ -508,27 +482,34 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       return;
     }
 
-    const newTournamentData = { ...tournamentData };
-    const pool = [...newTournamentData.pools[poolName]];
+    const newTournamentData = { ...tournamentData }; // Shallow copy tournamentData
+    newTournamentData.pools = JSON.parse(
+      JSON.stringify(newTournamentData.pools),
+    ); // Deep copy pools
+
+    const pool = newTournamentData.pools[poolName];
     const [movedTeam] = pool.splice(draggedTeam.index, 1);
     pool.splice(index, 0, movedTeam);
-    newTournamentData.pools[poolName] = pool;
+
+    // Pool order changed, so bracket needs regeneration and picks are invalid
+    newTournamentData.bracket = createEmptyBracket();
     setTournamentData(newTournamentData);
-    setBracketGeneratedFromPools(false); // Pool order changed, bracket needs regeneration
+    setBracketGeneratedFromPools(false);
     setDraggedTeam(null);
   };
 
   const generateBracket = () => {
-    if (!isEditing || isLocked) return;
-    const newBracket = populateBracketFromPools(
-      tournamentData.pools,
-      tournamentData.bracket,
-    );
+    if (!isEditing || isLocked || isViewingSomeoneElse) return;
+
+    // Create a deep copy of pools to pass to populateBracketFromPools
+    // and to ensure 'advanced' status is correctly updated on a fresh copy for display
+    const currentPoolsCopy = JSON.parse(JSON.stringify(tournamentData.pools));
+    const newBracket = populateBracketFromPools(currentPoolsCopy);
+
     setTournamentData((prev) => ({
       ...prev!,
+      pools: currentPoolsCopy, // Use the modified copy of pools
       bracket: newBracket,
-      // Update pools in tournamentData state to reflect advanced status
-      pools: JSON.parse(JSON.stringify(prev!.pools)), // Deep copy to trigger re-render if needed
     }));
     setBracketGeneratedFromPools(true);
   };
@@ -538,26 +519,28 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     gameId: number,
     teamNumber: 1 | 2,
   ) => {
-    if (!isEditing || isLocked || !bracketGeneratedFromPools) return;
+    if (
+      !isEditing ||
+      isLocked ||
+      !bracketGeneratedFromPools ||
+      isViewingSomeoneElse
+    )
+      return;
 
     setTournamentData((prevData) => {
       if (!prevData) return null;
       const newTournamentData = JSON.parse(
         JSON.stringify(prevData),
-      ) as TournamentDisplayData; // Deep copy
+      ) as TournamentDisplayData;
       const game = newTournamentData.bracket[roundName].find(
         (g) => g.id === gameId,
       );
-
       if (!game) return newTournamentData;
       const selectedTeam = teamNumber === 1 ? game.team1 : game.team2;
       if (selectedTeam === 'TBD') return newTournamentData;
 
-      // If clicking the current winner, deselect (clear winner and subsequent games)
       if (game.winner === selectedTeam) {
         game.winner = null;
-        // TODO: Clear subsequent games more robustly
-        // For now, let's clear the direct next game if this was a winning pick
         clearNextRound(
           newTournamentData.bracket,
           roundName,
@@ -577,7 +560,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     });
   };
 
-  // Helper to update the next round based on a winner
   const updateNextRound = (
     bracket: TournamentDisplayData['bracket'],
     currentRound: keyof TournamentDisplayData['bracket'],
@@ -630,37 +612,37 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     if (nextRoundKey && nextGameId !== null && teamPosInNextGame !== null) {
       const nextGame = bracket[nextRoundKey].find((g) => g.id === nextGameId);
       if (nextGame) {
+        const oldTeamInNextSlot =
+          teamPosInNextGame === 1 ? nextGame.team1 : nextGame.team2;
         if (teamPosInNextGame === 1) nextGame.team1 = winner;
         else nextGame.team2 = winner;
-        nextGame.winner = null; // Clear winner of next game as it's now TBD
-        // Recursively clear further rounds if this game's winner was already set
-        clearNextRound(
-          bracket,
-          nextRoundKey,
-          nextGameId,
-          nextGame.team1 === winner ? nextGame.team2 : nextGame.team1,
-        ); // Clear based on the other team if it was part of a previous win
+
+        // If the team in the slot changed, or if there was a winner, clear subsequent winner
+        if (oldTeamInNextSlot !== winner || nextGame.winner) {
+          const oldWinnerOfNextGame = nextGame.winner;
+          nextGame.winner = null;
+          if (oldWinnerOfNextGame) {
+            clearNextRound(
+              bracket,
+              nextRoundKey,
+              nextGame.id,
+              oldWinnerOfNextGame,
+            );
+          }
+        }
       }
     }
   };
 
-  // Helper to clear subsequent rounds if a winner is deselected or changed
   const clearNextRound = (
     bracket: TournamentDisplayData['bracket'],
     currentRound: keyof TournamentDisplayData['bracket'],
     gameId: number,
-    teamThatNoLongerAdvances: string | null, // The team that was previously winning this game
+    teamThatNoLongerAdvances: string | null,
   ) => {
-    // This function needs to be robust. If a winner is cleared,
-    // any subsequent game that featured this winner must be reset.
-    // And its winner, and so on.
-    // For simplicity in this example, we'll just clear the immediate next game.
-    // A full implementation would trace all dependencies.
-
     let nextRoundKey: keyof TournamentDisplayData['bracket'] | null = null;
     let nextGameId: number | null = null;
 
-    // Determine the next game affected
     if (currentRound === 'prequarters') {
       nextRoundKey = 'quarters';
       const mapping = [
@@ -681,27 +663,27 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       nextGameId = mapping.find((m) => m.id === gameId)?.nextId || null;
     } else if (currentRound === 'semis') {
       nextRoundKey = 'final';
-      nextGameId = 11; // Only one final game
+      nextGameId = 11;
     }
 
     if (nextRoundKey && nextGameId) {
       const nextGame = bracket[nextRoundKey].find((g) => g.id === nextGameId);
       if (nextGame) {
-        let changed = false;
+        let teamSlotChanged = false;
         if (nextGame.team1 === teamThatNoLongerAdvances) {
           nextGame.team1 = 'TBD';
-          changed = true;
+          teamSlotChanged = true;
         }
         if (nextGame.team2 === teamThatNoLongerAdvances) {
           nextGame.team2 = 'TBD';
-          changed = true;
+          teamSlotChanged = true;
         }
-        if (changed || nextGame.winner) {
-          // If teams changed or if there was a winner
+
+        if (teamSlotChanged || nextGame.winner) {
           const oldWinnerOfNextGame = nextGame.winner;
           nextGame.winner = null;
           if (oldWinnerOfNextGame) {
-            // If this game had a winner, recursively clear
+            // If this game itself had a winner that depended on teamThatNoLongerAdvances
             clearNextRound(
               bracket,
               nextRoundKey,
@@ -715,7 +697,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   };
 
   const handleSaveUserPicks = async () => {
-    if (!tournamentData || !user || !user.uid) {
+    if (!tournamentData || !user || !user.uid || isLocked) {
+      // Added isLocked check
       setSaveMessage(
         'Cannot save. Bracket might be locked or user data missing.',
       );
@@ -724,7 +707,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     }
     if (!bracketGeneratedFromPools) {
       setSaveMessage(
-        'Please generate the bracket from pool rankings before saving.',
+        'Please populate the bracket from pool rankings before saving.',
       );
       setShowSaveToast(true);
       return;
@@ -734,18 +717,13 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       setShowSaveToast(true);
       return;
     }
-
     setIsSaving(true);
     setSaveMessage(null);
-
-    // Ensure the tournamentData being saved is the FirebaseTournamentType
     const dataToSave: FirebaseTournamentType = {
-      name: tournamentData.name, // Base tournament name
+      name: tournamentData.name,
       pools: tournamentData.pools,
       bracket: tournamentData.bracket,
-      // timestamp and champion will be set by saveUserBracketPicks
     };
-
     try {
       await saveUserBracketPicks(
         user.uid,
@@ -754,7 +732,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         dataToSave,
       );
       setSaveMessage(`Bracket "${userBracketName}" saved successfully!`);
-      setIsEditing(false); // Switch to view mode after saving
+      setIsEditing(false);
     } catch (error) {
       console.error('Error saving user bracket picks:', error);
       setSaveMessage(`Failed to save bracket. ${(error as Error).message}`);
@@ -777,25 +755,19 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                 <div className="pool-teams-container">
                   {(poolTeams || []).map((team, index) => (
                     <div
-                      key={index}
-                      className={`pool-team-item ${team.advanced ? 'pool-team-advanced' : ''}`}
+                      key={team.team + index} // Ensure unique key if team names can repeat across reorders
+                      className={`pool-team-item ${team.advanced && bracketGeneratedFromPools ? 'pool-team-advanced' : ''}`}
                       draggable={
-                        isEditing &&
-                        !isLocked &&
-                        !bracketGeneratedFromPools &&
-                        !isViewingSomeoneElse
-                      }
+                        isEditing && !isLocked && !isViewingSomeoneElse
+                      } // MODIFIED
                       onDragStart={() => handleDragStart(poolName, index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(poolName, index)}
                       style={{
                         cursor:
-                          isEditing &&
-                          !isLocked &&
-                          !bracketGeneratedFromPools &&
-                          !isViewingSomeoneElse
+                          isEditing && !isLocked && !isViewingSomeoneElse
                             ? 'grab'
-                            : 'default',
+                            : 'default', // MODIFIED
                       }}
                     >
                       <div className="d-flex justify-content-between align-items-center">
@@ -805,9 +777,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                             {getSeed(team.team)}
                           </Badge>
                         </div>
-                        {/* Wins/Losses might not be user-editable, but kept for structure
-                        <span className="team-record">{team.wins} - {team.losses}</span>
-                        */}
                       </div>
                     </div>
                   ))}
@@ -817,20 +786,22 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           </Col>
         ))}
       </Row>
-      {isEditing && !isLocked && (
-        <div className="d-flex justify-content-center mt-3 mb-5">
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={generateBracket}
-            disabled={bracketGeneratedFromPools || !isEditing || isLocked}
-          >
-            {bracketGeneratedFromPools
-              ? 'Bracket Populated'
-              : 'Populate Bracket from Pool Rankings'}
-          </Button>
-        </div>
-      )}
+      {isEditing &&
+        !isLocked &&
+        !isViewingSomeoneElse && ( // Only show button if editing own bracket
+          <div className="d-flex justify-content-center mt-3 mb-5">
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={generateBracket}
+              disabled={bracketGeneratedFromPools} // Disable if already populated
+            >
+              {bracketGeneratedFromPools
+                ? 'Bracket Populated'
+                : 'Populate Bracket from Pool Rankings'}
+            </Button>
+          </div>
+        )}
     </div>
   );
 
@@ -909,21 +880,26 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           ))}
         </Row>
       </div>
-
-      {bracketGeneratedFromPools && isEditing && !isLocked && (
-        <p className="text-center text-muted mt-2">
-          Click on a team to advance them. Click again to deselect.
-        </p>
-      )}
-      {isBracketComplete && !isEditing && (
-        <Alert variant="success" className="text-center mt-3">
-          {!isViewingSomeoneElse ? 'Your bracket is complete!' : ''}
-          Champion:{' '}
-          <strong>
-            {getTeamName(tournamentData.bracket.final[0].winner!)}
-          </strong>
-        </Alert>
-      )}
+      {bracketGeneratedFromPools &&
+        isEditing &&
+        !isLocked &&
+        !isViewingSomeoneElse && (
+          <p className="text-center text-muted mt-2">
+            Click on a team to advance them. Click again to deselect.
+          </p>
+        )}
+      {isBracketComplete &&
+        (!isEditing || isViewingSomeoneElse) && ( // Show completed message if not editing OR if viewing someone else
+          <Alert variant="success" className="text-center mt-3">
+            {!isViewingSomeoneElse
+              ? 'Your bracket is complete!'
+              : 'Bracket is complete.'}
+            Champion:{' '}
+            <strong>
+              {getTeamName(tournamentData.bracket.final[0].winner!)}
+            </strong>
+          </Alert>
+        )}
     </div>
   );
 
@@ -941,9 +917,9 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         </Container>
       </div>
 
-      {/* Bracket Name and Edit/Save Controls */}
-      {!isViewingSomeoneElse ? (
+      {!isViewingSomeoneElse && (
         <Card className="mb-4">
+          <Card.Header>My Bracket Controls</Card.Header>
           <Card.Body>
             <Row>
               <Col md={isEditing ? 8 : 12}>
@@ -964,44 +940,31 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                     variant="success"
                     onClick={handleSaveUserPicks}
                     disabled={
-                      isSaving ||
-                      !bracketGeneratedFromPools ||
-                      isViewingSomeoneElse ||
-                      isLocked ||
-                      !isEditing
+                      isSaving || !bracketGeneratedFromPools || isLocked
                     }
                     className="w-100"
                   >
                     {isSaving ? (
                       <>
-                        <Spinner
-                          as="span"
-                          animation="border"
-                          size="sm"
-                          role="status"
-                          aria-hidden="true"
-                        />{' '}
+                        <Spinner as="span" animation="border" size="sm" />{' '}
                         Saving...
                       </>
                     ) : (
-                      'Save picks & bracket name'
+                      'Save Picks & Name'
                     )}
                   </Button>
                 </Col>
               )}
             </Row>
-            {!isEditing &&
-              !isLocked &&
-              !isViewingSomeoneElse &&
-              user?.uid === effectiveUserId && (
-                <Button
-                  variant="info"
-                  onClick={() => setIsEditing(true)}
-                  className="mt-3"
-                >
-                  Edit Bracket
-                </Button>
-              )}
+            {!isEditing && !isLocked && user?.uid === effectiveUserId && (
+              <Button
+                variant="info"
+                onClick={() => setIsEditing(true)}
+                className="mt-3"
+              >
+                Edit Bracket
+              </Button>
+            )}
             {isLocked && !isViewingSomeoneElse && (
               <Alert variant="warning" className="mt-3">
                 Bracket is locked. No more edits allowed.
@@ -1009,9 +972,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             )}
           </Card.Body>
         </Card>
-      ) : null}
+      )}
 
-      {/* Countdown and Points */}
       <Row className="mb-4 text-center">
         <Col md={4}>
           <Card bg="light">
@@ -1045,60 +1007,73 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         </Col>
       </Row>
 
-      {/* Pool Play section */}
       <div className="bg-light py-3 mb-4 border rounded">
         <Container>
           <h3 className="text-center mb-0">Pool Play</h3>
-          {isEditing &&
-            !isLocked &&
-            !bracketGeneratedFromPools &&
-            !isViewingSomeoneElse && (
-              <p className="text-center text-muted mt-2 mb-0">
-                Drag and drop teams to reorder within pools. Then, populate the
-                bracket.
-              </p>
-            )}
-          {(!isEditing || (isLocked && !bracketGeneratedFromPools)) &&
-            !isViewingSomeoneElse && (
-              <p className="text-center text-muted mt-2 mb-0">
-                Pool rankings are set. Click "Edit Bracket" to make changes if
-                not locked.
-              </p>
-            )}
-          {bracketGeneratedFromPools && !isViewingSomeoneElse && (
+          {isEditing && !isLocked && !isViewingSomeoneElse && (
             <p className="text-center text-muted mt-2 mb-0">
-              Pool rankings used to generate bracket. Edit pools by first
-              resetting/clearing bracket or re-generate.
+              Drag and drop teams to reorder pools.
+              {!bracketGeneratedFromPools &&
+                ' Then, populate the bracket using the button below.'}
+              {bracketGeneratedFromPools &&
+                ' Pool order changed, re-populate bracket below.'}
+            </p>
+          )}
+          {(!isEditing || isLocked || isViewingSomeoneElse) && ( // Viewing or locked
+            <p className="text-center text-muted mt-2 mb-0">
+              Current pool rankings.
+              {!isViewingSomeoneElse &&
+                !isLocked &&
+                user?.uid === effectiveUserId &&
+                ' Click "Edit Bracket" to make changes.'}
             </p>
           )}
         </Container>
       </div>
       {renderPoolStandings()}
 
-      {/* Bracket section */}
       <div className="mt-5">
         <div className="bg-light py-3 mb-4 border rounded">
           <Container>
             <h3 className="text-center mb-0">Bracket Play</h3>
-            {!bracketGeneratedFromPools && (!isEditing || isLocked) && (
-              <p className="text-center text-muted mt-2 mb-0">
-                Generate bracket from pool play first.
-              </p>
-            )}
-            {bracketGeneratedFromPools && isEditing && !isLocked && (
-              <p className="text-center text-muted mt-2 mb-0">
-                Click teams to advance them. Picks are saved with "Save My Picks
-                & Name".
-              </p>
-            )}
+            {isEditing &&
+              !isLocked &&
+              !isViewingSomeoneElse &&
+              !bracketGeneratedFromPools && (
+                <p className="text-center text-muted mt-2 mb-0">
+                  Populate bracket from pool rankings to make picks.
+                </p>
+              )}
+            {isEditing &&
+              !isLocked &&
+              !isViewingSomeoneElse &&
+              bracketGeneratedFromPools && (
+                <p className="text-center text-muted mt-2 mb-0">
+                  Click teams to advance them. Save picks with "Save Picks &
+                  Name".
+                </p>
+              )}
+            {(!isEditing || isLocked || isViewingSomeoneElse) &&
+              !bracketGeneratedFromPools && (
+                <p className="text-center text-muted mt-2 mb-0">
+                  Bracket not yet populated from pools.
+                </p>
+              )}
+            {(!isEditing || isLocked || isViewingSomeoneElse) &&
+              bracketGeneratedFromPools && (
+                <p className="text-center text-muted mt-2 mb-0">
+                  Current bracket picks.
+                </p>
+              )}
           </Container>
         </div>
         {bracketGeneratedFromPools ? (
           renderBracket()
         ) : (
           <Alert variant="info" className="text-center">
-            Please complete pool rankings and click "Populate Bracket from Pool
-            Rankings" above to view the bracket.
+            {isEditing && !isLocked && !isViewingSomeoneElse
+              ? 'Please complete pool rankings and click "Populate Bracket from Pool Rankings" above to view and interact with the bracket.'
+              : 'Bracket will be displayed once populated from pool rankings.'}
           </Alert>
         )}
       </div>
