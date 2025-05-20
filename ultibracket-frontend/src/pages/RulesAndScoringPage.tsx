@@ -1,5 +1,3 @@
-// src/pages/RulesAndScoringPage.tsx
-import React from 'react';
 import { Container, Card, ListGroup, Row, Col, Table } from 'react-bootstrap';
 
 // Import scoring constants if you want to display them dynamically,

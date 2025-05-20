@@ -11,14 +11,13 @@ import {
   Form, // Added Form
   Alert, // Added Alert
 } from 'react-bootstrap';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import './Tournament.css';
 // Updated import path and functions
 import {
   saveUserBracketPicks,
   getUserBracketPicks,
   Tournament as FirebaseTournamentType, // Use aliased type
-  UserBracketPicks as FirebaseUserBracketPicksType,
   getMasterTournament,
   saveMasterTournament, // Use aliased type
   deleteMasterTournament,

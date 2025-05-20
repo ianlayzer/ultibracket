@@ -1,5 +1,3 @@
-// src/pages/BracketViewerPage.tsx
-import React from 'react';
 import { useParams } from 'react-router-dom';
 import TournamentView from '../components/Tournament'; // Adjust path
 import { Container, Alert } from 'react-bootstrap';
@@ -12,12 +10,6 @@ function BracketViewerPage() {
     userId: string;
     baseTournamentNameSlug: string;
   }>();
-  // const { currentUser } = useAuth(); // Get logged-in user if needed for the `user` prop of TournamentView
-
-  // For TournamentView, the 'user' prop is the person *currently browsing*.
-  // It can be null if you allow anonymous viewing of shared brackets.
-  // Let's assume for now you have a way to get this, or pass null.
-  const loggedInUser = null; // Example: replace with actual data: currentUser ? { email: currentUser.email, uid: currentUser.uid } : null;
 
   if (!userId || !baseTournamentNameSlug) {
     return (
