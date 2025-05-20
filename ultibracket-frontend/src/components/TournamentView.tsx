@@ -420,6 +420,49 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   }, [masterBracketForScoring]);
 
   useEffect(() => {
+    if (tournamentData?.bracket) {
+      const finalGame = tournamentData.bracket.final[0];
+      setIsBracketComplete(!!finalGame?.winner);
+    } else {
+      setIsBracketComplete(false);
+    }
+
+    if (
+      !isMasterBracket &&
+      tournamentData?.bracket &&
+      !isLoadingMasterForScoring
+    ) {
+      const scores = calculateBracketScoresAgainstMaster(
+        tournamentData.bracket,
+        masterBracketForScoring,
+      );
+      setCurrentScore(scores.currentScore);
+
+      // IF YOU IMPLEMENT A NEW DYNAMIC FUNCTION:
+      // const dynamicPossible = calculateDynamicPossiblePoints(tournamentData.bracket, masterBracketForScoring);
+      // setPossiblePointsRemaining(dynamicPossible);
+
+      // Using the current simpler version from calculateBracketScoresAgainstMaster:
+      setPossiblePointsRemaining(scores.possiblePointsRemaining);
+      setMaxPointsForDisplay(scores.maxPoints);
+    } else if (isMasterBracket) {
+      setCurrentScore(0);
+      setPossiblePointsRemaining(0);
+      setMaxPointsForDisplay(0);
+    } else {
+      // Fallback or still loading master
+      setCurrentScore(0);
+      setPossiblePointsRemaining(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
+      setMaxPointsForDisplay(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
+    }
+  }, [
+    tournamentData,
+    isMasterBracket,
+    masterBracketForScoring,
+    isLoadingMasterForScoring,
+  ]);
+
+  useEffect(() => {
     const loadMainBracketData = async () => {
       if (isMasterBracket) {
         if (!currentMasterBracketIdentifier) {
@@ -1450,7 +1493,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
               </Card.Body>
             </Card>
           </Col>
-          <Col md={4}>
+          {/* <Col md={4}>
             <Card bg="light">
               <Card.Header>Possible Points Remaining</Card.Header>
               <Card.Body>
@@ -1461,7 +1504,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                 )}
               </Card.Body>
             </Card>
-          </Col>
+          </Col> */}
         </Row>
       )}
       {isMasterBracket && (

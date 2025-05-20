@@ -101,6 +101,7 @@ function LeaderboardPage() {
             return {
               ...userPick,
               calculatedScore: scores.currentScore,
+              // Use the possiblePointsRemaining from the utility
               calculatedPossiblePointsRemaining: scores.possiblePointsRemaining,
             };
           },
@@ -210,13 +211,13 @@ function LeaderboardPage() {
               >
                 Current Score {getSortIndicator('calculatedScore')}
               </th>
-              <th
+              {/* <th
                 onClick={() => handleSort('calculatedPossiblePointsRemaining')}
                 style={{ cursor: 'pointer' }}
               >
                 Possible Points Remaining{' '}
                 {getSortIndicator('calculatedPossiblePointsRemaining')}
-              </th>
+              </th> */}
               <th
                 onClick={() => handleSort('userChampion')}
                 style={{ cursor: 'pointer' }}
@@ -244,7 +245,7 @@ function LeaderboardPage() {
                 <td>
                   {bracket.calculatedScore} / {maxPointsForDisplay}
                 </td>
-                <td>{bracket.calculatedPossiblePointsRemaining}</td>
+                {/* <td>{bracket.calculatedPossiblePointsRemaining}</td> */}
                 <td>{bracket.champion || 'N/A'}</td>
               </tr>
             ))}
