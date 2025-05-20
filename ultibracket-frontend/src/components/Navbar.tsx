@@ -82,6 +82,13 @@ const Navbar = () => {
                 Ultiworld
               </NavDropdown.Item>
               <NavDropdown.Item
+                href="https://frisbee-rankings.com/"
+                target="_blank" // Opens in a new tab
+                rel="noopener noreferrer" // Security best practice for target="_blank"
+              >
+                frisbee-rankings
+              </NavDropdown.Item>
+              <NavDropdown.Item
                 href="https://www.callahanvideos.com"
                 target="_blank" // Opens in a new tab
                 rel="noopener noreferrer" // Security best practice for target="_blank"
