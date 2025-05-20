@@ -1,4 +1,3 @@
-// TournamentView.tsx
 import {
   Card,
   Badge,
@@ -27,7 +26,6 @@ import { useDivision } from '../contexts/DivisionContext';
 import {
   calculateBracketScoresAgainstMaster,
   MAX_POSSIBLE_POINTS_NEW_SYSTEM,
-  SCORING_RULES,
   SCORING_RULES_ROUND_NAMES,
 } from './../utils/scoreUtils';
 
