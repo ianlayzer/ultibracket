@@ -12,11 +12,15 @@ import {
 import {
   getAllUserBracketsForTournament,
   UserBracketPicks as FirebaseUserBracketPicksType,
+  getMasterTournament, // Add this
+  Tournament as FirebaseTournamentType,
 } from './../firebase/FirebaseUtils'; // Adjust path as needed
 import {
-  calculateBracketScores,
-  MAX_POSSIBLE_POINTS,
+  calculateBracketScoresAgainstMaster,
+  MAX_POSSIBLE_POINTS_NEW_SYSTEM,
 } from './../utils/scoreUtils'; // Adjust path as needed
+
+const MASTER_TOURNAMENT_ID_FOR_SCORING = 'MASTER_BRACKET_USAU_2025';
 
 // Helper to slugify text for URL parameters
 const slugify = (text: string): string => {
@@ -39,7 +43,8 @@ interface LeaderboardEntry extends FirebaseUserBracketPicksType {
 type SortableColumn =
   | 'userBracketName'
   | 'calculatedScore'
-  | 'calculatedPossiblePointsRemaining';
+  | 'calculatedPossiblePointsRemaining'
+  | 'userChampion';
 
 function LeaderboardPage() {
   const { tournamentNameParam } = useParams<{ tournamentNameParam?: string }>();
@@ -49,52 +54,76 @@ function LeaderboardPage() {
     : 'USA Ultimate College Nationals 2025'; // Default if no param
 
   const [brackets, setBrackets] = useState<LeaderboardEntry[]>([]);
+  const [masterBracketData, setMasterBracketData] =
+    useState<FirebaseTournamentType | null>(null); // State for master data
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [maxPointsForDisplay, setMaxPointsForDisplay] = useState<number>(
+    MAX_POSSIBLE_POINTS_NEW_SYSTEM,
+  ); // For table header
   const [sortBy, setSortBy] = useState<SortableColumn>('calculatedScore');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
-    const fetchBrackets = async () => {
+    const fetchLeaderboardData = async () => {
       setIsLoading(true);
       setError(null);
+      setMasterBracketData(null); // Reset on each fetch
       try {
-        // Ensure baseTournamentNameForLeaderboard is a valid string
         if (!baseTournamentNameForLeaderboard) {
-          throw new Error('Tournament name not specified for leaderboard.');
+          throw new Error(
+            'Base tournament name for user brackets not specified for leaderboard.',
+          );
         }
-        const rawBrackets = await getAllUserBracketsForTournament(
+
+        // 1. Fetch Master Bracket (using the fixed ID)
+        const master = await getMasterTournament(
+          MASTER_TOURNAMENT_ID_FOR_SCORING,
+        );
+        setMasterBracketData(master); // Store master data (can be null if not found)
+
+        // 2. Fetch User Brackets for the specified baseTournamentNameForLeaderboard
+        const rawUserBrackets = await getAllUserBracketsForTournament(
           baseTournamentNameForLeaderboard,
         );
-        const processedBrackets: LeaderboardEntry[] = rawBrackets.map(
-          (bracket) => {
-            const scores = calculateBracketScores(
-              bracket.tournamentData?.bracket,
+
+        // 3. Process and Score
+        const processedBrackets: LeaderboardEntry[] = rawUserBrackets.map(
+          (userPick) => {
+            // Pass the fetched master object (which might be null)
+            const scores = calculateBracketScoresAgainstMaster(
+              userPick.tournamentData?.bracket,
+              master,
             );
+
             return {
-              ...bracket,
+              ...userPick,
               calculatedScore: scores.currentScore,
               calculatedPossiblePointsRemaining: scores.possiblePointsRemaining,
             };
           },
         );
+
         setBrackets(processedBrackets);
+        // maxPointsForDisplay will be MAX_POSSIBLE_POINTS_NEW_SYSTEM as defined in scoreUtils
+        // It doesn't change based on master bracket completeness for display purposes.
+        setMaxPointsForDisplay(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
       } catch (err) {
         console.error('Failed to load leaderboard data:', err);
-        setError(`Failed to load leaderboard data. ${(err as Error).message}`);
+        setError(`Failed to load leaderboard. ${(err as Error).message}`);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBrackets();
+    fetchLeaderboardData();
   }, [baseTournamentNameForLeaderboard]);
 
   const sortedBrackets = useMemo(() => {
     return [...brackets].sort((a, b) => {
       let valA, valB;
 
-      if (sortBy === 'userBracketName') {
+      if (sortBy === 'userBracketName' || sortBy === 'userChampion') {
         valA = a.userBracketName.toLowerCase();
         valB = b.userBracketName.toLowerCase();
       } else {
@@ -157,58 +186,77 @@ function LeaderboardPage() {
     );
   }
 
+  const showMasterNotAvailableMessage =
+    !isLoading && !error && !masterBracketData && brackets.length > 0;
+
   return (
     <Container className="mt-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2>🏆 Leaderboard</h2>
-        {/* Optionally, add controls to switch baseTournamentNameForLeaderboard if you have multiple */}
-      </div>
+      {/* ... Title ... */}
+      {showMasterNotAvailableMessage && (
+        <Alert variant="info" className="mt-3">
+          Official tournament results are not yet available for scoring. All
+          current scores are 0.
+        </Alert>
+      )}
       <h4 className="mb-3 text-muted">{baseTournamentNameForLeaderboard}</h4>
-      <Table striped bordered hover responsive className="mt-3">
-        <thead>
-          <tr>
-            <th
-              onClick={() => handleSort('userBracketName')}
-              style={{ cursor: 'pointer' }}
-            >
-              Bracket Name {getSortIndicator('userBracketName')}
-            </th>
-            <th
-              onClick={() => handleSort('calculatedScore')}
-              style={{ cursor: 'pointer' }}
-            >
-              Current Score {getSortIndicator('calculatedScore')}
-            </th>
-            <th
-              onClick={() => handleSort('calculatedPossiblePointsRemaining')}
-              style={{ cursor: 'pointer' }}
-            >
-              Possible Points Remaining{' '}
-              {getSortIndicator('calculatedPossiblePointsRemaining')}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedBrackets.map((bracket) => (
-            // Ensure bracket.userId and bracket.baseTournamentName exist and are strings for the key
-            <tr
-              key={`${bracket.userId}-${slugify(bracket.baseTournamentName)}`}
-            >
-              <td>
-                <Link
-                  to={`/brackets/${bracket.userId}/${slugify(bracket.baseTournamentName)}`}
-                >
-                  {bracket.userBracketName}
-                </Link>
-              </td>
-              <td>
-                {bracket.calculatedScore} / {MAX_POSSIBLE_POINTS}
-              </td>
-              <td>{bracket.calculatedPossiblePointsRemaining}</td>
+      {brackets.length === 0 && !isLoading && !error && (
+        <Alert variant="info" className="mt-3">
+          No user brackets found for "{baseTournamentNameForLeaderboard}" yet.
+        </Alert>
+      )}
+      {brackets.length > 0 && (
+        <Table striped bordered hover responsive className="mt-3">
+          <thead>
+            <tr>
+              <th
+                onClick={() => handleSort('userBracketName')}
+                style={{ cursor: 'pointer' }}
+              >
+                Bracket Name {getSortIndicator('userBracketName')}
+              </th>
+              <th
+                onClick={() => handleSort('calculatedScore')}
+                style={{ cursor: 'pointer' }}
+              >
+                Current Score {getSortIndicator('calculatedScore')}
+              </th>
+              <th
+                onClick={() => handleSort('calculatedPossiblePointsRemaining')}
+                style={{ cursor: 'pointer' }}
+              >
+                Possible Points Remaining{' '}
+                {getSortIndicator('calculatedPossiblePointsRemaining')}
+              </th>
+              <th
+                onClick={() => handleSort('userChampion')}
+                style={{ cursor: 'pointer' }}
+              >
+                Champion {getSortIndicator('userChampion')}
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </Table>
+          </thead>
+          <tbody>
+            {sortedBrackets.map((bracket) => (
+              <tr
+                key={`${bracket.userId}-${slugify(bracket.baseTournamentName)}`}
+              >
+                <td>
+                  <Link
+                    to={`/brackets/${bracket.userId}/${slugify(bracket.baseTournamentName)}`}
+                  >
+                    {bracket.userBracketName}
+                  </Link>
+                </td>
+                <td>
+                  {bracket.calculatedScore} / {maxPointsForDisplay}{' '}
+                </td>
+                <td>{bracket.calculatedPossiblePointsRemaining}</td>
+                <td>{bracket.champion}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
     </Container>
   );
 }

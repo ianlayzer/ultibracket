@@ -6,11 +6,10 @@ import {
 } from 'react-router-dom';
 import LeaderboardPage from './pages/LeaderboardPage';
 import BracketViewerPage from './pages/BracketViewerPage';
-import GroupsPage from './pages/GroupsPage';
 import MyBracketPage from './pages/MyBracketPage';
 import NotFoundPage from './pages/NotFoundPage';
 import Navbar from './components/Navbar';
-import PredictionPage from './pages/PredictionPage';
+import MasterBracketAdminPage from './pages/MasterBracketAdminPage';
 
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -57,6 +56,10 @@ function App() {
                   <LeaderboardPage /> // Or a welcome page
                 )
               }
+            />
+            <Route
+              path="/master-bracket"
+              element={<MasterBracketAdminPage />}
             />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
