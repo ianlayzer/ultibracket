@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   query,
   where,
+  deleteDoc,
 } from 'firebase/firestore';
 
 // Firebase configuration
@@ -258,6 +259,29 @@ export const getAllMasterTournaments = async (): Promise<Tournament[]> => {
   } catch (error) {
     console.error('Error getting all master tournaments:', error);
     throw error;
+  }
+};
+
+/**
+ * Delete a MASTER tournament by its slugified name (ID)
+ * @param tournamentName The base name of the tournament to delete
+ * @returns Promise that resolves when deletion is attempted
+ */
+export const deleteMasterTournament = async (
+  tournamentName: string,
+): Promise<void> => {
+  try {
+    const tournamentId = slugify(tournamentName);
+    if (!tournamentId) {
+      throw new Error('Tournament name is required to delete.');
+    }
+
+    const tournamentRef = doc(db, 'tournaments', tournamentId);
+    await deleteDoc(tournamentRef);
+    console.log(`Master tournament "${tournamentId}" deleted successfully.`);
+  } catch (error) {
+    console.error('Error deleting master tournament:', error);
+    throw error; // Re-throw to be caught by the caller
   }
 };
 

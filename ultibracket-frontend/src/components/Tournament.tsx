@@ -21,6 +21,7 @@ import {
   UserBracketPicks as FirebaseUserBracketPicksType,
   getMasterTournament,
   saveMasterTournament, // Use aliased type
+  deleteMasterTournament,
 } from './../firebase/FirebaseUtils';
 import { useAuth } from '../firebase/useAuth';
 
@@ -1007,6 +1008,40 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     </div>
   );
 
+  const handleDeleteMasterBracket = async () => {
+    if (!isMasterBracket || !masterBracketIdentifier) {
+      setSaveMessage(
+        'This action is only for master brackets and requires an identifier.',
+      );
+      setShowSaveToast(true);
+      return;
+    }
+
+    setIsSaving(true); // Use isSaving to disable buttons during operation
+    setSaveMessage(null);
+
+    try {
+      await deleteMasterTournament(masterBracketIdentifier);
+      setSaveMessage(
+        `Master bracket "${masterBracketIdentifier}" deleted successfully. You can recreate it by saving again.`,
+      );
+      setShowSaveToast(true);
+      // Reset local state to an empty master bracket structure
+      setTournamentData(createTournamentData(teams, masterBracketIdentifier));
+      setUserBracketName(masterBracketIdentifier); // Or 'Master Results Bracket'
+      setBracketGeneratedFromPools(false);
+      setIsBracketComplete(false);
+    } catch (error) {
+      console.error('Error deleting master bracket:', error);
+      setSaveMessage(
+        `Failed to delete master bracket. ${(error as Error).message}`,
+      );
+      setShowSaveToast(true);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <Container className="mt-4">
       <div className="bg-primary text-white py-3 mb-4 border rounded">
@@ -1067,6 +1102,16 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                       'Save Picks & Name'
                     )}
                   </Button>
+                  {isMasterBracket && (
+                    <Button
+                      variant="outline-danger"
+                      size="lg"
+                      onClick={handleDeleteMasterBracket}
+                      disabled={isSaving} // Disable if another operation is in progress
+                    >
+                      Delete Master Bracket
+                    </Button>
+                  )}
                 </Col>
               )}
             </Row>

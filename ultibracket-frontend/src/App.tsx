@@ -14,6 +14,7 @@ import MasterBracketAdminPage from './pages/MasterBracketAdminPage';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { auth } from './firebase/firebase';
+import RulesAndScoringPage from './pages/RulesAndScoringPage';
 
 function App() {
   const currentUser = auth;
@@ -57,6 +58,7 @@ function App() {
                 )
               }
             />
+            <Route path="/scoring" element={<RulesAndScoringPage />} />
             <Route
               path="/master-bracket"
               element={<MasterBracketAdminPage />}

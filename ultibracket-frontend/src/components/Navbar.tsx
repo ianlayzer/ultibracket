@@ -19,6 +19,9 @@ const Navbar = () => {
             </li>
           </>
         ) : null}
+        <li>
+          <Link to="/scoring">Scoring</Link>
+        </li>
         {user ? (
           <li>
             <span>{user.displayName || user.email} </span>
