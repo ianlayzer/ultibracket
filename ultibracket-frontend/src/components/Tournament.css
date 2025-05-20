@@ -151,3 +151,57 @@
 .tournament-bracket-container {
   min-height: 700px;
 }
+
+/* In Tournament.css */
+.pool-team-item {
+  /* Your existing styles for pool-team-item */
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  background-color: white;
+  transition:
+    background-color 0.2s ease-in-out,
+    opacity 0.2s ease-in-out; /* For smooth transitions */
+}
+
+.pool-team-item:last-child {
+  border-bottom: none;
+}
+
+.pool-team-item.dragging-active {
+  opacity: 0.5;
+  /* You might want to slightly change the background or border */
+  background-color: #f0f8ff; /* AliceBlue, for example */
+}
+
+.pool-team-item.drag-over-active {
+  background-color: #e6f2ff; /* A slightly different shade for hover indication */
+  /* Add a border or outline to clearly show the drop target */
+  border-top: 2px dashed #007bff;
+  border-bottom: 2px dashed #007bff;
+}
+
+/* Make sure advanced styling is still visible */
+.pool-team-item.pool-team-advanced {
+  background-color: #d4edda; /* Light green for advanced teams */
+  color: #155724;
+  font-weight: bold;
+}
+
+.pool-team-item.pool-team-advanced.dragging-active {
+  opacity: 0.7; /* Keep advanced style, but indicate dragging */
+  background-color: #c3e6cb;
+}
+
+.pool-team-item.pool-team-advanced.drag-over-active {
+  background-color: #b1dfbb;
+  border-top: 2px dashed #0056b3;
+  border-bottom: 2px dashed #0056b3;
+}
+
+/* Ensure cursor grab is visible */
+.pool-team-item[style*='cursor: grab'] {
+  cursor: grab !important;
+}
+.pool-team-item[style*='cursor: grab']:active {
+  cursor: grabbing !important;
+}

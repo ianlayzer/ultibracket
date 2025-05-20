@@ -13,7 +13,7 @@ import {
   Modal,
 } from 'react-bootstrap';
 import { useState, useEffect, useMemo } from 'react';
-import './Tournament.css';
+import './Tournament.css'; // Make sure to add suggested CSS classes here
 import {
   saveUserBracketPicks,
   getUserBracketPicks,
@@ -277,6 +277,10 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     poolName: string;
     index: number;
   } | null>(null);
+  const [touchDragOverItem, setTouchDragOverItem] = useState<{
+    poolName: string;
+    index: number;
+  } | null>(null);
   const [bracketGeneratedFromPools, setBracketGeneratedFromPools] =
     useState<boolean>(false);
   const [isBracketComplete, setIsBracketComplete] = useState<boolean>(false);
@@ -292,8 +296,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [currentScore, setCurrentScore] = useState<number>(0);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
-  // const [possiblePointsRemaining, setPossiblePointsRemaining] =
-  //   useState<number>(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
   const [maxPointsForDisplay, setMaxPointsForDisplay] = useState<number>(
     MAX_POSSIBLE_POINTS_NEW_SYSTEM,
   );
@@ -303,7 +305,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     useState<boolean>(!isMasterBracket);
 
   const masterConfirmedData = useMemo(() => {
-    // Renamed from masterConfirmedTeams for clarity
     if (!masterBracketForScoring || !masterBracketForScoring.bracket)
       return null;
 
@@ -313,7 +314,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       teamsByRound: { [K in RoundName]?: Set<string> };
       champion: string | null;
       completedRounds: Set<RoundName>;
-      allTeamsEverPlayedOrAdvancedInMaster: Set<string>; // New set for "eliminated" check
+      allTeamsEverPlayedOrAdvancedInMaster: Set<string>;
     } = {
       teamsByRound: {
         prequarters: new Set<string>(),
@@ -329,11 +330,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       allTeamsEverPlayedOrAdvancedInMaster: new Set<string>(),
     };
 
-    // Populate teamsByRound based on who is *slotted* into each round in the master bracket
-    // and who won to advance.
-    // Also populate allTeamsEverPlayedOrAdvancedInMaster
-
-    // Prequarters
     let prequartersComplete = true;
     bracket.prequarters.forEach((g) => {
       if (g.team1 && g.team1 !== 'TBD') {
@@ -345,24 +341,21 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(g.team2);
       }
       if (g.winner && g.winner !== 'TBD') {
-        confirmed.teamsByRound.quarters!.add(g.winner); // Winner advances to quarters set
+        confirmed.teamsByRound.quarters!.add(g.winner);
         confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(g.winner);
       } else {
-        prequartersComplete = false; // If any game doesn't have a winner, round isn't complete
+        prequartersComplete = false;
       }
     });
     if (prequartersComplete && bracket.prequarters.length > 0)
       confirmed.completedRounds.add('prequarters');
 
-    // Pool winners also go to quarters
     (Object.values(pools) as PoolTeam[][]).forEach((poolTeams) => {
       if (poolTeams[0]?.team && poolTeams[0].team !== 'TBD') {
         confirmed.teamsByRound.quarters!.add(poolTeams[0].team);
         confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(poolTeams[0].team);
       }
     });
-    // Ensure any teams directly slotted into master QF games are also added
-    // (though populateBracketFromPools should handle this by design)
     bracket.quarters.forEach((g) => {
       if (g.team1 && g.team1 !== 'TBD')
         confirmed.teamsByRound.quarters!.add(g.team1);
@@ -370,10 +363,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         confirmed.teamsByRound.quarters!.add(g.team2);
     });
 
-    // Quarters
     let quartersComplete = true;
     bracket.quarters.forEach((g) => {
-      // Teams in QF slots already added above
       if (g.winner && g.winner !== 'TBD') {
         confirmed.teamsByRound.semis!.add(g.winner);
         confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(g.winner);
@@ -383,7 +374,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     });
     if (quartersComplete && bracket.quarters.length > 0)
       confirmed.completedRounds.add('quarters');
-    // Ensure any teams directly slotted into master Semis games are also added
     bracket.semis.forEach((g) => {
       if (g.team1 && g.team1 !== 'TBD')
         confirmed.teamsByRound.semis!.add(g.team1);
@@ -391,7 +381,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         confirmed.teamsByRound.semis!.add(g.team2);
     });
 
-    // Semis
     let semisComplete = true;
     bracket.semis.forEach((g) => {
       if (g.winner && g.winner !== 'TBD') {
@@ -410,10 +399,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         confirmed.teamsByRound.final!.add(g.team2);
     });
 
-    // Final
     if (bracket.final[0]?.winner && bracket.final[0].winner !== 'TBD') {
       confirmed.completedRounds.add('final');
-      // Champion is already stored at the top level of 'confirmed'
       confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(
         bracket.final[0].winner,
       );
@@ -439,22 +426,12 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         masterBracketForScoring,
       );
       setCurrentScore(scores.currentScore);
-
-      // IF YOU IMPLEMENT A NEW DYNAMIC FUNCTION:
-      // const dynamicPossible = calculateDynamicPossiblePoints(tournamentData.bracket, masterBracketForScoring);
-      // setPossiblePointsRemaining(dynamicPossible);
-
-      // Using the current simpler version from calculateBracketScoresAgainstMaster:
-      // setPossiblePointsRemaining(scores.possiblePointsRemaining);
       setMaxPointsForDisplay(scores.maxPoints);
     } else if (isMasterBracket) {
       setCurrentScore(0);
-      // setPossiblePointsRemaining(0);
       setMaxPointsForDisplay(0);
     } else {
-      // Fallback or still loading master
       setCurrentScore(0);
-      // setPossiblePointsRemaining(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
       setMaxPointsForDisplay(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
     }
   }, [
@@ -613,6 +590,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     currentBaseTournamentName,
     currentMasterBracketIdentifier,
     getDivisionSpecificName,
+    getDivisionSpecificMasterId, // Added missing dependency
   ]);
 
   useEffect(() => {
@@ -651,41 +629,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     setIsEditing,
   ]);
 
-  useEffect(() => {
-    if (tournamentData?.bracket) {
-      const finalGame = tournamentData.bracket.final[0];
-      setIsBracketComplete(!!finalGame?.winner);
-    } else {
-      setIsBracketComplete(false);
-    }
-    if (
-      !isMasterBracket &&
-      tournamentData?.bracket &&
-      !isLoadingMasterForScoring
-    ) {
-      const scores = calculateBracketScoresAgainstMaster(
-        tournamentData.bracket,
-        masterBracketForScoring,
-      );
-      setCurrentScore(scores.currentScore);
-      // setPossiblePointsRemaining(scores.possiblePointsRemaining);
-      setMaxPointsForDisplay(scores.maxPoints);
-    } else if (isMasterBracket) {
-      setCurrentScore(0);
-      // setPossiblePointsRemaining(0);
-      setMaxPointsForDisplay(0);
-    } else {
-      setCurrentScore(0);
-      // setPossiblePointsRemaining(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
-      setMaxPointsForDisplay(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
-    }
-  }, [
-    tournamentData,
-    isMasterBracket,
-    masterBracketForScoring,
-    isLoadingMasterForScoring,
-  ]);
-
   const isOverallLoading =
     isLoading ||
     (!isMasterBracket && user === undefined) ||
@@ -716,36 +659,114 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     );
   }
 
+  // Drag and Drop Handlers for Pools
+  const canEditPools =
+    isEditing &&
+    (isMasterBracket || !isLocked) &&
+    (!viewOnlyUserId || user?.uid === viewOnlyUserId);
+
   const handleDragStart = (poolName: string, index: number) => {
-    const canDrag =
-      isEditing && (isMasterBracket || !isLocked) && !viewOnlyUserId;
-    if (!canDrag) return;
+    if (!canEditPools) return;
     setDraggedTeam({ poolName, index });
   };
-  const handleDragOver = (e: React.DragEvent) => {
-    const canDrag =
-      isEditing && (isMasterBracket || !isLocked) && !viewOnlyUserId;
-    if (!canDrag) return;
+
+  const handleDragOverItem = (
+    e: React.DragEvent,
+    poolName: string,
+    index: number,
+  ) => {
+    if (!canEditPools) return;
     e.preventDefault();
+    setTouchDragOverItem({ poolName, index });
   };
-  const handleDrop = (poolName: string, index: number) => {
-    const canDrop =
-      isEditing && (isMasterBracket || !isLocked) && !viewOnlyUserId;
-    if (!canDrop || !draggedTeam || draggedTeam.poolName !== poolName) {
+
+  const handleDragLeaveItem = () => {
+    if (!canEditPools) return;
+    setTouchDragOverItem(null);
+  };
+
+  const handleDragEnd = () => {
+    if (!canEditPools) return;
+    setDraggedTeam(null);
+    setTouchDragOverItem(null);
+  };
+
+  const handleDrop = (targetPoolName: string, targetIndex: number) => {
+    if (
+      !canEditPools ||
+      !draggedTeam ||
+      draggedTeam.poolName !== targetPoolName
+    ) {
       setDraggedTeam(null);
+      setTouchDragOverItem(null);
       return;
     }
     const newTournamentData = { ...tournamentData };
     newTournamentData.pools = JSON.parse(
       JSON.stringify(newTournamentData.pools),
     );
-    const pool = newTournamentData.pools[poolName];
+    const pool = newTournamentData.pools[draggedTeam.poolName];
     const [movedTeam] = pool.splice(draggedTeam.index, 1);
-    pool.splice(index, 0, movedTeam);
-    newTournamentData.bracket = createEmptyBracket();
+    pool.splice(targetIndex, 0, movedTeam);
+    newTournamentData.bracket = createEmptyBracket(); // Reset bracket on pool reorder
     setTournamentData(newTournamentData);
     setBracketGeneratedFromPools(false);
     setDraggedTeam(null);
+    setTouchDragOverItem(null);
+  };
+
+  // Touch Handlers for Pools
+  const handleTouchStart = (poolName: string, index: number) => {
+    if (!canEditPools) return;
+    setDraggedTeam({ poolName, index });
+    // Optionally, you can add a class to the body to prevent scrolling while dragging
+    // document.body.style.overflow = 'hidden';
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!canEditPools || !draggedTeam) return;
+    e.preventDefault(); // Prevent scrolling while dragging
+
+    const touch = e.touches[0];
+    const targetElement = document.elementFromPoint(
+      touch.clientX,
+      touch.clientY,
+    );
+
+    if (targetElement) {
+      const poolItemElement = targetElement.closest('.pool-team-item');
+      if (poolItemElement) {
+        const targetPoolName = poolItemElement.getAttribute('data-pool-name');
+        const targetIndexStr = poolItemElement.getAttribute('data-index');
+        if (targetPoolName && targetIndexStr) {
+          const targetIndex = parseInt(targetIndexStr, 10);
+          if (draggedTeam.poolName === targetPoolName) {
+            setTouchDragOverItem({
+              poolName: targetPoolName,
+              index: targetIndex,
+            });
+          } else {
+            setTouchDragOverItem(null); // Can't drag between pools
+          }
+          return; // Found a valid pool item, no need to clear
+        }
+      }
+    }
+    setTouchDragOverItem(null); // Clear if not over a valid target
+  };
+
+  const handleTouchEnd = () => {
+    if (!canEditPools || !draggedTeam) return;
+    // document.body.style.overflow = ''; // Restore scrolling
+
+    if (
+      touchDragOverItem &&
+      draggedTeam.poolName === touchDragOverItem.poolName
+    ) {
+      handleDrop(touchDragOverItem.poolName, touchDragOverItem.index);
+    }
+    setDraggedTeam(null);
+    setTouchDragOverItem(null);
   };
 
   const generateBracket = () => {
@@ -961,7 +982,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     }
     setIsSaving(true);
     setSaveMessage(null);
-    setShowSuccessModal(false); // Ensure modal is hidden initially if re-saving
+    setShowSuccessModal(false);
     const dataToSave: FirebaseTournamentType = {
       name: tournamentData.name,
       pools: tournamentData.pools,
@@ -989,7 +1010,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           `Bracket "${userBracketName}" for ${currentDivision} division saved successfully!`,
         );
         setIsEditing(false);
-        setShowSuccessModal(true); // <--- SHOW THE MODAL ON SUCCESS
+        setShowSuccessModal(true);
       } else {
         throw new Error('Cannot determine save type or user missing.');
       }
@@ -1042,10 +1063,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     }
   };
 
-  const canEditPools =
-    isEditing &&
-    (isMasterBracket || !isLocked) &&
-    (!viewOnlyUserId || user?.uid === viewOnlyUserId);
   const canClickBracketTeams =
     isEditing &&
     (isMasterBracket || !isLocked) &&
@@ -1068,26 +1085,56 @@ const TournamentView: React.FC<TournamentViewProps> = ({
               </Card.Header>
               <Card.Body className="p-0">
                 <div className="pool-teams-container">
-                  {(poolTeams || []).map((team, index) => (
-                    <div
-                      key={`${currentDivision}-${team.team}-${index}`}
-                      className={`pool-team-item ${team.advanced && bracketGeneratedFromPools ? 'pool-team-advanced' : ''}`}
-                      draggable={canEditPools}
-                      onDragStart={() => handleDragStart(poolName, index)}
-                      onDragOver={handleDragOver}
-                      onDrop={() => handleDrop(poolName, index)}
-                      style={{ cursor: canEditPools ? 'grab' : 'default' }}
-                    >
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div className="d-flex align-items-center">
-                          <span>{getTeamName(team.team)}</span>
-                          <Badge bg="secondary" className="ms-2">
-                            {getSeed(team.team)}
-                          </Badge>
+                  {(poolTeams || []).map((team, index) => {
+                    const isBeingDragged =
+                      draggedTeam?.poolName === poolName &&
+                      draggedTeam?.index === index;
+                    const isDragOverTarget =
+                      touchDragOverItem?.poolName === poolName &&
+                      touchDragOverItem?.index === index;
+
+                    // Add CSS classes to Tournament.css:
+                    // .pool-team-item.dragging-active { opacity: 0.5; }
+                    // .pool-team-item.drag-over-active { background-color: #e0e0e0; border: 2px dashed #007bff; }
+                    let itemClasses = 'pool-team-item';
+                    if (team.advanced && bracketGeneratedFromPools)
+                      itemClasses += ' pool-team-advanced';
+                    if (isBeingDragged) itemClasses += ' dragging-active';
+                    if (isDragOverTarget) itemClasses += ' drag-over-active';
+
+                    return (
+                      <div
+                        key={`${currentDivision}-${team.team}-${index}`}
+                        className={itemClasses}
+                        draggable={canEditPools}
+                        onDragStart={() => handleDragStart(poolName, index)}
+                        onDragOver={(e) =>
+                          handleDragOverItem(e, poolName, index)
+                        }
+                        onDragLeave={handleDragLeaveItem}
+                        onDrop={() => handleDrop(poolName, index)}
+                        onDragEnd={handleDragEnd}
+                        onTouchStart={() => handleTouchStart(poolName, index)}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        data-pool-name={poolName}
+                        data-index={index}
+                        style={{
+                          cursor: canEditPools ? 'grab' : 'default',
+                          touchAction: canEditPools ? 'none' : 'auto', // Prevent scrolling on draggable items on touch
+                        }}
+                      >
+                        <div className="d-flex justify-content-between align-items-center">
+                          <div className="d-flex align-items-center">
+                            <span>{getTeamName(team.team)}</span>
+                            <Badge bg="secondary" className="ms-2">
+                              {getSeed(team.team)}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </Card.Body>
             </Card>
@@ -1147,11 +1194,9 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       const masterRoundIsComplete =
         masterConfirmedData.completedRounds?.has(roundName);
 
-      // Team 1 Logic
       if (userGame.team1 && userGame.team1 !== 'TBD') {
         let isImpossible = false;
         if (roundName !== 'prequarters') {
-          // Only check prior rounds if not prequarters
           for (const prevRound of ROUND_ORDER) {
             if (prevRound === roundName) break;
             if (
@@ -1176,21 +1221,19 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             userGame.team1 === masterConfirmedData.champion
           ) {
             team1PointsDisplay = `+${SCORING_RULES_ROUND_NAMES.FINALS + SCORING_RULES_ROUND_NAMES.CHAMPION}`;
-            team1Classes += ' team-correct-pick'; // Also a correct winner pick
+            team1Classes += ' team-correct-pick';
           } else if (
             userWinner === userGame.team1 &&
             masterGame?.winner === userGame.team1
           ) {
-            team1Classes += ' team-correct-pick'; // Correctly picked winner of this game
+            team1Classes += ' team-correct-pick';
           }
         } else if (masterRoundIsComplete) {
-          // Current round complete, team not there
           team1Classes += ' team-incorrect-slot';
           team1PointsDisplay = '+0';
         }
       }
 
-      // Team 2 Logic (Similar to Team 1)
       if (userGame.team2 && userGame.team2 !== 'TBD') {
         let isImpossible = false;
         if (roundName !== 'prequarters') {
@@ -1231,7 +1274,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       }
     }
 
-    // Apply base winner style from user's perspective if not showing detailed feedback
     if (!showScoringFeedback) {
       if (userWinner === userGame.team1 && userGame.team1 !== 'TBD')
         team1Classes += ' winner';
@@ -1497,18 +1539,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
               </Card.Body>
             </Card>
           </Col>
-          {/* <Col md={4}>
-            <Card bg="light">
-              <Card.Header>Possible Points Remaining</Card.Header>
-              <Card.Body>
-                {isLoadingMasterForScoring ? (
-                  <Spinner animation="border" size="sm" />
-                ) : (
-                  <Card.Title>{possiblePointsRemaining}</Card.Title>
-                )}
-              </Card.Body>
-            </Card>
-          </Col> */}
         </Row>
       )}
       {isMasterBracket && (
@@ -1523,27 +1553,19 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           <h3 className="text-center mb-0">
             Pool Play ({currentDivision.toUpperCase()})
           </h3>
-          {isMasterBracket && isEditing && (
-            <p className="text-center text-muted mt-2 mb-0">
-              Drag and drop teams to reorder pools for Master Results.
-              {!bracketGeneratedFromPools && ' Then, populate the bracket.'}
-              {bracketGeneratedFromPools &&
-                ' Pool order changed, re-populate bracket.'}
-            </p>
-          )}
-          {!isMasterBracket && isEditing && !isLocked && !viewOnlyUserId && (
+          {canEditPools && (
             <p className="text-center text-muted mt-2 mb-0">
               Drag and drop teams to reorder pools.
-              {!bracketGeneratedFromPools &&
-                ' Then, populate the bracket using the button below.'}
+              {!bracketGeneratedFromPools && ' Then, populate the bracket.'}
               {bracketGeneratedFromPools &&
-                ' Pool order changed, re-populate bracket below.'}
+                ' Pool order changed? Re-populate bracket below.'}
             </p>
           )}
-          {!isMasterBracket && (!isEditing || isLocked || viewOnlyUserId) && (
+          {!canEditPools && (
             <p className="text-center text-muted mt-2 mb-0">
               Current pool rankings.
-              {!viewOnlyUserId &&
+              {!isMasterBracket &&
+                !viewOnlyUserId &&
                 !isLocked &&
                 ' Click "Edit Bracket" to make changes.'}
             </p>
@@ -1667,9 +1689,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
               }}
               className="mt-2"
             >
-              <i className="bi bi-clipboard-check me-2"></i>{' '}
-              {/* Optional: Bootstrap Icon */}
-              Copy Site Link
+              <i className="bi bi-clipboard-check me-2"></i> Copy Site Link
             </Button>
           </Modal.Body>
           <Modal.Footer>
