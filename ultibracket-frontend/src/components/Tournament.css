@@ -1,220 +1,153 @@
-.bracket-container {
-  width: 100%;
-  overflow-x: auto;
-  padding: 20px 0;
-}
+/* Tournament.css */
 
-.bracket-headers {
-  margin-bottom: 20px;
-}
-
-.bracket-body {
-  display: flex;
-  justify-content: space-between;
-  min-height: 700px;
-}
-
-.bracket-round {
-  display: flex;
-  flex-direction: column;
-  width: 24%;
-  position: relative;
-}
-
-.bracket-game {
-  margin-bottom: 2px;
-  border-radius: 4px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  width: 90%;
-}
-
+/* Base Bracket Team Styling */
 .bracket-team {
   padding: 8px 12px;
   background-color: #fff;
   border: 1px solid #dee2e6;
   border-bottom: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 40px;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    opacity 0.2s,
+    color 0.2s;
+  position: relative;
 }
-
 .bracket-team:last-child {
   border-bottom: 1px solid #dee2e6;
 }
+.bracket-team .team-name-seed-wrapper {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+}
+.bracket-team .team-name-seed-wrapper span:first-child {
+  margin-right: 5px;
+}
+.bracket-team.clickable:hover {
+  filter: brightness(95%);
+  cursor: pointer;
+}
 
+/* Default User Winner Highlight (when no master feedback is active) */
 .bracket-team.winner {
-  background-color: rgba(40, 167, 69, 0.2);
+  background-color: #e6f2ff;
+  border-left: 4px solid #0d6efd;
   font-weight: bold;
+  color: #0a58ca;
 }
 
-.bracket-team.loser {
-  background-color: rgba(220, 53, 69, 0.2);
-  color: #6c757d;
+/* --- Scoring Feedback Styles --- */
+
+/* 1. Team Correctly Slotted in this Round */
+.bracket-team.team-correct-slot {
+  border: 2px solid #198754 !important; /* Green outline */
+  background-color: #f0fff4; /* Very light green */
 }
 
-.seed-badge {
-  text-align: center;
+/* 2. Team Incorrectly Slotted (Master round complete, user's team not there) */
+.bracket-team.team-incorrect-slot {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: #6c757d;
+  background-color: #e9ecef !important;
+  color: #6c757d !important;
+  opacity: 0.6;
+  border: 1px dashed #adb5bd !important;
+}
+.bracket-team.team-incorrect-slot .points-badge {
+  background-color: #6c757d !important;
 }
 
-.team-name {
-  font-size: 14px;
+/* 3. Team is Impossible (Eliminated in a *previous* confirmed master round) */
+.bracket-team.team-impossible {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: #6c757d;
+  background-color: #e9ecef !important;
+  color: #6c757d !important;
+  opacity: 0.6;
+  border: 1px dashed #adb5bd !important;
+}
+.bracket-team.team-impossible .points-badge {
+  background-color: #6c757d !important;
 }
 
-.score {
-  font-weight: 600;
+/* 4. User's WINNER pick for THIS GAME was CORRECT according to master */
+.bracket-team.team-correct-pick {
+  /* This class is now primarily for the checkmark, strong color comes from correct slot or winner points */
+}
+.bracket-team.team-correct-slot.team-correct-pick {
+  /* If correctly slotted AND picked winner */
+  background-color: #d1e7dd !important;
+  border-left: 4px solid #198754 !important;
+  font-weight: bold;
+  color: #0f5132 !important;
+}
+.bracket-team.team-correct-slot.team-correct-pick::after {
+  content: ' ✔️';
+  color: #198754;
+  margin-left: 5px;
+  font-size: 0.9em;
 }
 
-/* Fixed positioning for each matchup to ensure alignment */
-.bracket-game-wrapper {
-  position: absolute;
-  width: 100%;
+/* Points Badge */
+.points-badge {
+  font-size: 0.75em;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 0.25rem;
+  color: white;
+  background-color: #6c757d; /* Default for +0 */
+  margin-left: auto;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.bracket-team.team-correct-slot .points-badge,
+.bracket-team.team-correct-pick .points-badge {
+  /* If it's a correct slot or a correct pick (final round) */
+  background-color: #198754;
 }
 
-/* Pre-quarters positioning - 8 games */
-.prequarter-game:nth-child(1) {
-  top: 0%;
-}
-.prequarter-game:nth-child(2) {
-  top: 12.5%;
-}
-.prequarter-game:nth-child(3) {
-  top: 25%;
-}
-.prequarter-game:nth-child(4) {
-  top: 37.5%;
-}
-.prequarter-game:nth-child(5) {
-  top: 50%;
-}
-.prequarter-game:nth-child(6) {
-  top: 62.5%;
-}
-.prequarter-game:nth-child(7) {
-  top: 75%;
-}
-.prequarter-game:nth-child(8) {
-  top: 87.5%;
-}
-
-/* Quarterfinals positioning - 4 games that align with pre-quarters winners */
-.quarter-game:nth-child(1) {
-  top: 6.25%; /* Aligned between 1st and 2nd prequarter games */
-}
-.quarter-game:nth-child(2) {
-  top: 31.25%; /* Aligned between 3rd and 4th prequarter games */
-}
-.quarter-game:nth-child(3) {
-  top: 56.25%; /* Aligned between 5th and 6th prequarter games */
-}
-.quarter-game:nth-child(4) {
-  top: 81.25%; /* Aligned between 7th and 8th prequarter games */
-}
-
-/* Semifinals positioning - 2 games that align with quarterfinals winners */
-.semi-game:nth-child(1) {
-  top: 18.75%; /* Aligned between 1st and 2nd quarter games */
-}
-.semi-game:nth-child(2) {
-  top: 68.75%; /* Aligned between 3rd and 4th quarter games */
-}
-
-/* Finals positioning - centered between semifinals */
-.final-game {
-  top: 43.75%; /* Centered between the two semifinals */
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .bracket-container {
-    overflow-x: scroll;
-  }
-
-  .bracket-body {
-    min-width: 800px;
-  }
-}
-
-/* Add this class to your main component to ensure proper height */
-.tournament-bracket-container {
-  min-height: 700px;
-}
-
-/* Style for teams that advanced */
-tr.winner {
-  background-color: rgba(40, 167, 69, 0.1) !important;
-  font-weight: 500;
-}
-
-/* Ensure this overrides Bootstrap's striping */
-.table-striped tbody tr.winner:nth-of-type(odd),
-.table-striped tbody tr.winner:nth-of-type(even) {
-  background-color: rgba(40, 167, 69, 0.1) !important;
-}
-
-/* Class for the custom background that was previously used */
-.bg-light-success {
-  background-color: rgba(40, 167, 69, 0.1);
-}
-
-/* Pool team styles */
+/* Pool Team & Other Styles (Retained from previous full CSS) */
 .pool-teams-container {
   display: flex;
   flex-direction: column;
 }
-
 .pool-team-item {
   padding: 10px 15px;
   border-bottom: 1px solid #dee2e6;
   transition: background-color 0.2s;
 }
-
 .pool-team-item:last-child {
   border-bottom: none;
 }
-
-/* Teams that advanced styling - matches the bracket winner style */
 .pool-team-advanced {
   background-color: rgba(40, 167, 69, 0.1);
   font-weight: 500;
 }
-
-.team-info {
-  display: flex;
-  align-items: center;
-}
-
-.seed-badge {
-  margin-right: 8px;
-  min-width: 28px;
-  text-align: center;
-}
-
-.team-name {
-  font-size: 14px;
-  margin-left: 8px;
-}
-
-.team-record {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-/* Pool card styles */
-.pool-card {
-  height: 100%;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-/* To prepare for drag-and-drop functionality later */
 .pool-team-item.draggable {
   cursor: grab;
 }
-
 .pool-team-item.dragging {
   opacity: 0.5;
   cursor: grabbing;
 }
-
 .pool-team-item.drop-target {
   border: 2px dashed #0d6efd;
+}
+@media (max-width: 768px) {
+  .bracket-container {
+    overflow-x: scroll;
+  }
+  .bracket-body {
+    min-width: 800px;
+  }
+}
+.tournament-bracket-container {
+  min-height: 700px;
 }

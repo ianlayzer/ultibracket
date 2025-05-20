@@ -12,7 +12,7 @@ import {
   Form,
   Alert,
 } from 'react-bootstrap';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './Tournament.css';
 import {
   saveUserBracketPicks,
@@ -23,26 +23,25 @@ import {
   deleteMasterTournament,
 } from './../firebase/FirebaseUtils';
 import { useAuth } from '../firebase/useAuth';
-import { useDivision } from '../contexts/DivisionContext'; // Import useDivision
+import { useDivision } from '../contexts/DivisionContext';
 import {
   calculateBracketScoresAgainstMaster,
   MAX_POSSIBLE_POINTS_NEW_SYSTEM,
+  SCORING_RULES,
+  SCORING_RULES_ROUND_NAMES,
 } from './../utils/scoreUtils';
 
-// Type definitions (Team, PoolTeam, BracketGame, TournamentDisplayData) - Unchanged
-
+// Type definitions
 interface Team {
   name: string;
   seed: number;
 }
-
 interface PoolTeam {
   team: string;
   wins: number;
   losses: number;
   advanced: boolean;
 }
-
 interface BracketGame {
   id: number;
   team1: string;
@@ -50,12 +49,9 @@ interface BracketGame {
   score: string;
   winner: string | null;
 }
-
 interface TournamentDisplayData {
   name: string;
-  pools: {
-    [key: string]: PoolTeam[];
-  };
+  pools: { [key: string]: PoolTeam[] };
   bracket: {
     prequarters: BracketGame[];
     quarters: BracketGame[];
@@ -64,21 +60,19 @@ interface TournamentDisplayData {
   };
 }
 
+// Helper functions
 const getTeamName = (fullTeamString: string): string => {
   if (!fullTeamString || fullTeamString === 'TBD') return 'TBD';
   return fullTeamString.replace(/\s*\(\d+\)$/, '');
 };
-
 const getSeed = (fullTeamString: string): number | null => {
   if (!fullTeamString || fullTeamString === 'TBD') return null;
   const match = fullTeamString.match(/\((\d+)\)$/);
   return match ? parseInt(match[1]) : null;
 };
+const formatTeamString = (team: Team): string => `${team.name} (${team.seed})`;
 
-const formatTeamString = (team: Team): string => {
-  return `${team.name} (${team.seed})`;
-};
-
+// Data creation functions
 const createPools = (teams: Team[]): { [key: string]: PoolTeam[] } => {
   const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
   const pools: { [key: string]: PoolTeam[] } = {
@@ -90,9 +84,9 @@ const createPools = (teams: Team[]): { [key: string]: PoolTeam[] } => {
   if (sortedTeams.length < 20) {
     console.warn('Not enough teams to fill pools for division.');
     const poolNames = Object.keys(pools);
-    sortedTeams.forEach((team, index) => {
-      pools[poolNames[index % poolNames.length]].push(createPoolTeam(team));
-    });
+    sortedTeams.forEach((team, index) =>
+      pools[poolNames[index % poolNames.length]].push(createPoolTeam(team)),
+    );
     return pools;
   }
   pools['Pool A'].push(createPoolTeam(sortedTeams[0]));
@@ -117,14 +111,12 @@ const createPools = (teams: Team[]): { [key: string]: PoolTeam[] } => {
   pools['Pool D'].push(createPoolTeam(sortedTeams[19]));
   return pools;
 };
-
 const createPoolTeam = (team: Team): PoolTeam => ({
   team: formatTeamString(team),
   wins: 0,
   losses: 0,
   advanced: false,
 });
-
 const createEmptyBracket = (): TournamentDisplayData['bracket'] => ({
   prequarters: Array(4)
     .fill(null)
@@ -155,7 +147,6 @@ const createEmptyBracket = (): TournamentDisplayData['bracket'] => ({
     })),
   final: [{ id: 11, team1: 'TBD', team2: 'TBD', score: '0 - 0', winner: null }],
 });
-
 const populateBracketFromPools = (pools: {
   [key: string]: PoolTeam[];
 }): TournamentDisplayData['bracket'] => {
@@ -164,9 +155,9 @@ const populateBracketFromPools = (pools: {
   const poolB = pools['Pool B']?.slice(0, 3) || [];
   const poolC = pools['Pool C']?.slice(0, 3) || [];
   const poolD = pools['Pool D']?.slice(0, 3) || [];
-  Object.values(pools).forEach((poolTeams) => {
-    poolTeams.forEach((pt) => (pt.advanced = false));
-  });
+  Object.values(pools).forEach((poolTeams) =>
+    poolTeams.forEach((pt) => (pt.advanced = false)),
+  );
   [...poolA, ...poolB, ...poolC, ...poolD].forEach((pt) => {
     for (const poolName in pools) {
       const teamInPool = pools[poolName].find(
@@ -192,7 +183,6 @@ const populateBracketFromPools = (pools: {
   newBracket.prequarters[3].team2 = poolA[2]?.team || 'TBD';
   return newBracket;
 };
-
 const createTournamentData = (
   teams: Team[],
   nameWithDivision: string,
@@ -202,7 +192,6 @@ const createTournamentData = (
   return { name: nameWithDivision, pools, bracket };
 };
 
-// Division-specific default teams
 const defaultMensTeams: Team[] = [
   { name: 'Massachusetts', seed: 1 },
   { name: 'Oregon', seed: 2 },
@@ -225,7 +214,6 @@ const defaultMensTeams: Team[] = [
   { name: 'Michigan', seed: 19 },
   { name: 'Ottawa', seed: 20 },
 ];
-
 const defaultWomensTeams: Team[] = [
   { name: 'British Columbia', seed: 1 },
   { name: 'Carleton', seed: 2 },
@@ -252,17 +240,18 @@ const defaultWomensTeams: Team[] = [
 const BASE_TOURNAMENT_NAME_CORE = 'USA Ultimate College Nationals 2025';
 const BASE_MASTER_BRACKET_ID_CORE = 'MASTER_BRACKET_USAU_2025';
 
+type RoundName = keyof TournamentDisplayData['bracket'];
+const ROUND_ORDER: RoundName[] = ['prequarters', 'quarters', 'semis', 'final'];
+
 interface TournamentViewProps {
   viewOnlyUserId?: string;
-  viewOnlyTournamentName?: string; // This will be the CORE name, division is from context
+  viewOnlyTournamentName?: string;
   isMasterBracket?: boolean;
-  // teams prop is removed, will be determined by division
-  // baseTournamentName prop is removed, will be determined by division + core name
 }
 
 const TournamentView: React.FC<TournamentViewProps> = ({
   viewOnlyUserId,
-  viewOnlyTournamentName, // This is the CORE tournament name if viewing someone else's specific tournament
+  viewOnlyTournamentName,
   isMasterBracket = false,
 }) => {
   const { user } = useAuth();
@@ -271,13 +260,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     getDivisionSpecificName,
     getDivisionSpecificMasterId,
   } = useDivision();
-
-  // Determine the correct set of teams and base name based on division
   const activeDefaultTeams =
     currentDivision === 'mens' ? defaultMensTeams : defaultWomensTeams;
-
-  // For user brackets, the base name (for UserBracketPicks doc) includes division
-  // For master bracket, its identifier (propBaseTournamentName for TournamentView) includes division
   const currentBaseTournamentName = getDivisionSpecificName(
     BASE_TOURNAMENT_NAME_CORE,
   );
@@ -305,10 +289,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     isMasterBracket ? true : !viewOnlyUserId,
   );
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
-
   const [countdown, setCountdown] = useState<string>('');
   const [isLocked, setIsLocked] = useState<boolean>(false);
-
   const [currentScore, setCurrentScore] = useState<number>(0);
   const [possiblePointsRemaining, setPossiblePointsRemaining] =
     useState<number>(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
@@ -320,11 +302,129 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   const [isLoadingMasterForScoring, setIsLoadingMasterForScoring] =
     useState<boolean>(!isMasterBracket);
 
+  const masterConfirmedData = useMemo(() => {
+    // Renamed from masterConfirmedTeams for clarity
+    if (!masterBracketForScoring || !masterBracketForScoring.bracket)
+      return null;
+
+    const bracket = masterBracketForScoring.bracket;
+    const pools = masterBracketForScoring.pools;
+    const confirmed: {
+      teamsByRound: { [K in RoundName]?: Set<string> };
+      champion: string | null;
+      completedRounds: Set<RoundName>;
+      allTeamsEverPlayedOrAdvancedInMaster: Set<string>; // New set for "eliminated" check
+    } = {
+      teamsByRound: {
+        prequarters: new Set<string>(),
+        quarters: new Set<string>(),
+        semis: new Set<string>(),
+        final: new Set<string>(),
+      },
+      champion:
+        bracket.final[0]?.winner && bracket.final[0].winner !== 'TBD'
+          ? bracket.final[0].winner
+          : null,
+      completedRounds: new Set<RoundName>(),
+      allTeamsEverPlayedOrAdvancedInMaster: new Set<string>(),
+    };
+
+    // Populate teamsByRound based on who is *slotted* into each round in the master bracket
+    // and who won to advance.
+    // Also populate allTeamsEverPlayedOrAdvancedInMaster
+
+    // Prequarters
+    let prequartersComplete = true;
+    bracket.prequarters.forEach((g) => {
+      if (g.team1 && g.team1 !== 'TBD') {
+        confirmed.teamsByRound.prequarters!.add(g.team1);
+        confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(g.team1);
+      }
+      if (g.team2 && g.team2 !== 'TBD') {
+        confirmed.teamsByRound.prequarters!.add(g.team2);
+        confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(g.team2);
+      }
+      if (g.winner && g.winner !== 'TBD') {
+        confirmed.teamsByRound.quarters!.add(g.winner); // Winner advances to quarters set
+        confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(g.winner);
+      } else {
+        prequartersComplete = false; // If any game doesn't have a winner, round isn't complete
+      }
+    });
+    if (prequartersComplete && bracket.prequarters.length > 0)
+      confirmed.completedRounds.add('prequarters');
+
+    // Pool winners also go to quarters
+    (Object.values(pools) as PoolTeam[][]).forEach((poolTeams) => {
+      if (poolTeams[0]?.team && poolTeams[0].team !== 'TBD') {
+        confirmed.teamsByRound.quarters!.add(poolTeams[0].team);
+        confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(poolTeams[0].team);
+      }
+    });
+    // Ensure any teams directly slotted into master QF games are also added
+    // (though populateBracketFromPools should handle this by design)
+    bracket.quarters.forEach((g) => {
+      if (g.team1 && g.team1 !== 'TBD')
+        confirmed.teamsByRound.quarters!.add(g.team1);
+      if (g.team2 && g.team2 !== 'TBD')
+        confirmed.teamsByRound.quarters!.add(g.team2);
+    });
+
+    // Quarters
+    let quartersComplete = true;
+    bracket.quarters.forEach((g) => {
+      // Teams in QF slots already added above
+      if (g.winner && g.winner !== 'TBD') {
+        confirmed.teamsByRound.semis!.add(g.winner);
+        confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(g.winner);
+      } else {
+        quartersComplete = false;
+      }
+    });
+    if (quartersComplete && bracket.quarters.length > 0)
+      confirmed.completedRounds.add('quarters');
+    // Ensure any teams directly slotted into master Semis games are also added
+    bracket.semis.forEach((g) => {
+      if (g.team1 && g.team1 !== 'TBD')
+        confirmed.teamsByRound.semis!.add(g.team1);
+      if (g.team2 && g.team2 !== 'TBD')
+        confirmed.teamsByRound.semis!.add(g.team2);
+    });
+
+    // Semis
+    let semisComplete = true;
+    bracket.semis.forEach((g) => {
+      if (g.winner && g.winner !== 'TBD') {
+        confirmed.teamsByRound.final!.add(g.winner);
+        confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(g.winner);
+      } else {
+        semisComplete = false;
+      }
+    });
+    if (semisComplete && bracket.semis.length > 0)
+      confirmed.completedRounds.add('semis');
+    bracket.final.forEach((g) => {
+      if (g.team1 && g.team1 !== 'TBD')
+        confirmed.teamsByRound.final!.add(g.team1);
+      if (g.team2 && g.team2 !== 'TBD')
+        confirmed.teamsByRound.final!.add(g.team2);
+    });
+
+    // Final
+    if (bracket.final[0]?.winner && bracket.final[0].winner !== 'TBD') {
+      confirmed.completedRounds.add('final');
+      // Champion is already stored at the top level of 'confirmed'
+      confirmed.allTeamsEverPlayedOrAdvancedInMaster.add(
+        bracket.final[0].winner,
+      );
+    }
+    return confirmed;
+  }, [masterBracketForScoring]);
+
   useEffect(() => {
     const loadMainBracketData = async () => {
       if (isMasterBracket) {
         if (!currentMasterBracketIdentifier) {
-          // Use division-specific ID
           setErrorLoading('Master bracket identifier is missing.');
           setTournamentData(null);
           return;
@@ -335,7 +435,10 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           );
           if (masterTournamentDataFirebase) {
             setTournamentData(masterTournamentDataFirebase);
-            setUserBracketName(masterTournamentDataFirebase.name); // Name from DB is already division specific
+            setUserBracketName(
+              masterTournamentDataFirebase.name ||
+                currentMasterBracketIdentifier,
+            );
             const hasPicks =
               masterTournamentDataFirebase.bracket.prequarters.some(
                 (g) => g.team1 !== 'TBD',
@@ -363,13 +466,10 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           setTournamentData(null);
         }
       } else {
-        // User Bracket Logic
         const targetUserId = viewOnlyUserId || user?.uid;
-        // viewOnlyTournamentName is the CORE name, need to make it division specific if provided
         const targetBaseName = viewOnlyTournamentName
           ? getDivisionSpecificName(viewOnlyTournamentName)
           : currentBaseTournamentName;
-
         if (!targetUserId || !targetBaseName) {
           setErrorLoading('Required user or tournament base name is missing.');
           setTournamentData(null);
@@ -381,7 +481,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             targetBaseName,
           );
           if (savedUserPicks) {
-            setTournamentData(savedUserPicks.tournamentData); // tournamentData.name inside here IS division specific
+            setTournamentData(savedUserPicks.tournamentData);
             setUserBracketName(savedUserPicks.userBracketName);
             const hasPicks =
               savedUserPicks.tournamentData.bracket.prequarters.some(
@@ -391,8 +491,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                 (g) => g.team1 !== 'TBD',
               );
             setBracketGeneratedFromPools(hasPicks);
-            setIsEditing(!!viewOnlyUserId ? false : true); // Edit if it's their own, view if viewing other's
-            if (viewOnlyUserId) setIsEditing(false); // Explicitly set to view if viewOnlyUserId
+            setIsEditing(!!viewOnlyUserId ? false : true);
+            if (viewOnlyUserId) setIsEditing(false);
           } else {
             const isOwnBracketContext = user?.uid === targetUserId;
             if (viewOnlyUserId && !isOwnBracketContext) {
@@ -432,22 +532,17 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         }
       }
     };
-
     const initializeComponent = async () => {
       setIsLoading(true);
       setErrorLoading(null);
-      setTournamentData(null); // Reset tournament data on division change
-
-      if (!isMasterBracket && user === undefined) {
-        return;
-      }
-
+      setTournamentData(null);
+      if (!isMasterBracket && user === undefined) return;
       let masterForScoringLoadPromise: Promise<void> = Promise.resolve();
       if (!isMasterBracket) {
         setIsLoadingMasterForScoring(true);
         masterForScoringLoadPromise = getMasterTournament(
           currentMasterBracketIdentifier,
-        ) // Use division specific master ID
+        )
           .then((master) => {
             setMasterBracketForScoring(master);
           })
@@ -459,12 +554,10 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             setIsLoadingMasterForScoring(false);
           });
       }
-
       await loadMainBracketData();
       await masterForScoringLoadPromise;
       setIsLoading(false);
     };
-
     initializeComponent();
   }, [
     user,
@@ -472,12 +565,12 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     viewOnlyTournamentName,
     isLocked,
     isMasterBracket,
-    currentDivision, // Re-run when division changes
+    currentDivision,
     activeDefaultTeams,
     currentBaseTournamentName,
     currentMasterBracketIdentifier,
     getDivisionSpecificName,
-  ]); // Add all derived division-specific vars
+  ]);
 
   useEffect(() => {
     if (isMasterBracket) {
@@ -522,7 +615,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     } else {
       setIsBracketComplete(false);
     }
-
     if (
       !isMasterBracket &&
       tournamentData?.bracket &&
@@ -826,8 +918,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     }
     setIsSaving(true);
     setSaveMessage(null);
-
-    // The tournamentData.name here is already division-specific (e.g., "USAU... - Men's Division")
     const dataToSave: FirebaseTournamentType = {
       name: tournamentData.name,
       pools: tournamentData.pools,
@@ -835,10 +925,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     };
     const finalGame = tournamentData.bracket.final[0];
     dataToSave.champion = finalGame?.winner || undefined;
-
     try {
       if (isMasterBracket) {
-        // For master bracket, its identifier (currentMasterBracketIdentifier) is also its "name" in Firestore "tournaments" collection
         await saveMasterTournament({
           ...dataToSave,
           name: currentMasterBracketIdentifier,
@@ -847,7 +935,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           `Master bracket "${currentMasterBracketIdentifier}" saved successfully!`,
         );
       } else if (user && user.uid) {
-        // For user brackets, tournamentData.name is the baseTournamentName argument for saveUserBracketPicks
         await saveUserBracketPicks(
           user.uid,
           tournamentData.name,
@@ -872,7 +959,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
 
   const handleDeleteMasterBracket = async () => {
     if (!isMasterBracket || !currentMasterBracketIdentifier) {
-      // Use currentMasterBracketIdentifier
       setSaveMessage(
         'This action is only for master brackets and requires an identifier.',
       );
@@ -920,14 +1006,17 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     (isMasterBracket || !isLocked) &&
     (!viewOnlyUserId || user?.uid === viewOnlyUserId) &&
     bracketGeneratedFromPools;
+  const showScoringFeedback =
+    !isMasterBracket &&
+    !isLoadingMasterForScoring &&
+    masterBracketForScoring?.bracket &&
+    masterConfirmedData;
 
   const renderPoolStandings = () => (
     <div className="mt-4">
       <Row>
         {Object.entries(tournamentData.pools).map(([poolName, poolTeams]) => (
           <Col md={3} key={`${currentDivision}-${poolName}`} className="mb-4">
-            {' '}
-            {/* Added currentDivision to key */}
             <Card className="pool-card">
               <Card.Header className="bg-secondary text-white text-center">
                 <h5 className="mb-0">{poolName}</h5>
@@ -982,50 +1071,172 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   );
 
   const BracketGameDisplay = ({
-    game,
+    userGame,
     roundName,
   }: {
-    game: BracketGame;
-    roundName: keyof TournamentDisplayData['bracket'];
+    userGame: BracketGame;
+    roundName: RoundName;
   }) => {
-    const team1Name = getTeamName(game.team1);
-    const team2Name = getTeamName(game.team2);
-    const seed1 = getSeed(game.team1);
-    const seed2 = getSeed(game.team2);
-    const isWinner1 = game.winner === game.team1 && game.team1 !== 'TBD';
-    const isWinner2 = game.winner === game.team2 && game.team2 !== 'TBD';
-    const clickable = canClickBracketTeams;
+    const userTeam1Name = getTeamName(userGame.team1);
+    const userTeam2Name = getTeamName(userGame.team2);
+    const userSeed1 = getSeed(userGame.team1);
+    const userSeed2 = getSeed(userGame.team2);
+    const userWinner = userGame.winner;
+    const clickable = canClickBracketTeams && !showScoringFeedback;
+
+    let team1Classes = 'bracket-team';
+    let team2Classes = 'bracket-team';
+    let team1PointsDisplay: string | null = null;
+    let team2PointsDisplay: string | null = null;
+
+    if (
+      showScoringFeedback &&
+      masterConfirmedData &&
+      masterBracketForScoring?.bracket
+    ) {
+      const masterGame = masterBracketForScoring.bracket[roundName]?.find(
+        (g) => g.id === userGame.id,
+      );
+      const currentRoundMasterConfirmedTeams =
+        masterConfirmedData.teamsByRound[roundName];
+      const masterRoundIsComplete =
+        masterConfirmedData.completedRounds?.has(roundName);
+
+      // Team 1 Logic
+      if (userGame.team1 && userGame.team1 !== 'TBD') {
+        let isImpossible = false;
+        if (roundName !== 'prequarters') {
+          // Only check prior rounds if not prequarters
+          for (const prevRound of ROUND_ORDER) {
+            if (prevRound === roundName) break;
+            if (
+              masterConfirmedData.completedRounds?.has(prevRound) &&
+              !masterConfirmedData.teamsByRound[prevRound]?.has(userGame.team1)
+            ) {
+              isImpossible = true;
+              break;
+            }
+          }
+        }
+
+        if (isImpossible) {
+          team1Classes += ' team-impossible';
+          team1PointsDisplay = '+0';
+        } else if (currentRoundMasterConfirmedTeams?.has(userGame.team1)) {
+          team1Classes += ' team-correct-slot';
+          team1PointsDisplay = `+${SCORING_RULES_ROUND_NAMES[roundName.toUpperCase() as keyof typeof SCORING_RULES_ROUND_NAMES]}`;
+          if (
+            roundName === 'final' &&
+            userWinner === userGame.team1 &&
+            userGame.team1 === masterConfirmedData.champion
+          ) {
+            team1PointsDisplay = `+${SCORING_RULES_ROUND_NAMES.FINALS + SCORING_RULES_ROUND_NAMES.CHAMPION}`;
+            team1Classes += ' team-correct-pick'; // Also a correct winner pick
+          } else if (
+            userWinner === userGame.team1 &&
+            masterGame?.winner === userGame.team1
+          ) {
+            team1Classes += ' team-correct-pick'; // Correctly picked winner of this game
+          }
+        } else if (masterRoundIsComplete) {
+          // Current round complete, team not there
+          team1Classes += ' team-incorrect-slot';
+          team1PointsDisplay = '+0';
+        }
+      }
+
+      // Team 2 Logic (Similar to Team 1)
+      if (userGame.team2 && userGame.team2 !== 'TBD') {
+        let isImpossible = false;
+        if (roundName !== 'prequarters') {
+          for (const prevRound of ROUND_ORDER) {
+            if (prevRound === roundName) break;
+            if (
+              masterConfirmedData.completedRounds?.has(prevRound) &&
+              !masterConfirmedData.teamsByRound[prevRound]?.has(userGame.team2)
+            ) {
+              isImpossible = true;
+              break;
+            }
+          }
+        }
+        if (isImpossible) {
+          team2Classes += ' team-impossible';
+          team2PointsDisplay = '+0';
+        } else if (currentRoundMasterConfirmedTeams?.has(userGame.team2)) {
+          team2Classes += ' team-correct-slot';
+          team2PointsDisplay = `+${SCORING_RULES_ROUND_NAMES[roundName.toUpperCase() as keyof typeof SCORING_RULES_ROUND_NAMES]}`;
+          if (
+            roundName === 'final' &&
+            userWinner === userGame.team2 &&
+            userGame.team2 === masterConfirmedData.champion
+          ) {
+            team2PointsDisplay = `+${SCORING_RULES_ROUND_NAMES.FINALS + SCORING_RULES_ROUND_NAMES.CHAMPION}`;
+            team2Classes += ' team-correct-pick';
+          } else if (
+            userWinner === userGame.team2 &&
+            masterGame?.winner === userGame.team2
+          ) {
+            team2Classes += ' team-correct-pick';
+          }
+        } else if (masterRoundIsComplete) {
+          team2Classes += ' team-incorrect-slot';
+          team2PointsDisplay = '+0';
+        }
+      }
+    }
+
+    // Apply base winner style from user's perspective if not showing detailed feedback
+    if (!showScoringFeedback) {
+      if (userWinner === userGame.team1 && userGame.team1 !== 'TBD')
+        team1Classes += ' winner';
+      if (userWinner === userGame.team2 && userGame.team2 !== 'TBD')
+        team2Classes += ' winner';
+    }
+
     return (
-      <div className="bracket-game mb-4">
-        <div
-          className={`bracket-team ${isWinner1 ? 'winner' : ''} ${clickable && game.team1 !== 'TBD' ? 'clickable' : ''}`}
-          onClick={() =>
-            clickable &&
-            game.team1 !== 'TBD' &&
-            handleTeamClick(roundName, game.id, 1)
-          }
-        >
-          <span>{team1Name}</span>
-          {seed1 && (
-            <Badge bg="secondary" className="ms-1">
-              {seed1}
-            </Badge>
-          )}
-        </div>
-        <div
-          className={`bracket-team ${isWinner2 ? 'winner' : ''} ${clickable && game.team2 !== 'TBD' ? 'clickable' : ''}`}
-          onClick={() =>
-            clickable &&
-            game.team2 !== 'TBD' &&
-            handleTeamClick(roundName, game.id, 2)
-          }
-        >
-          <span>{team2Name}</span>
-          {seed2 && (
-            <Badge bg="secondary" className="ms-1">
-              {seed2}
-            </Badge>
-          )}
+      <div className="bracket-game-container mb-4">
+        <div className="bracket-game">
+          <div
+            className={`${team1Classes} ${clickable && userGame.team1 !== 'TBD' ? 'clickable' : ''}`}
+            onClick={() =>
+              clickable &&
+              userGame.team1 !== 'TBD' &&
+              handleTeamClick(roundName, userGame.id, 1)
+            }
+          >
+            <span className="team-name-seed-wrapper">
+              <span>{userTeam1Name}</span>
+              {userSeed1 && (
+                <Badge bg="secondary" className="ms-1 seed-badge">
+                  {userSeed1}
+                </Badge>
+              )}
+            </span>
+            {team1PointsDisplay && (
+              <span className="points-badge">{team1PointsDisplay}</span>
+            )}
+          </div>
+          <div
+            className={`${team2Classes} ${clickable && userGame.team2 !== 'TBD' ? 'clickable' : ''}`}
+            onClick={() =>
+              clickable &&
+              userGame.team2 !== 'TBD' &&
+              handleTeamClick(roundName, userGame.id, 2)
+            }
+          >
+            <span className="team-name-seed-wrapper">
+              <span>{userTeam2Name}</span>
+              {userSeed2 && (
+                <Badge bg="secondary" className="ms-1 seed-badge">
+                  {userSeed2}
+                </Badge>
+              )}
+            </span>
+            {team2PointsDisplay && (
+              <span className="points-badge">{team2PointsDisplay}</span>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -1035,22 +1246,18 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     <div className="tournament-bracket mt-4">
       <div className="bracket-container">
         <Row>
-          {['prequarters', 'quarters', 'semis', 'final'].map((roundKey) => (
+          {ROUND_ORDER.map((roundKey) => (
             <Col
               md={3}
               key={`${currentDivision}-bracket-${roundKey}`}
               className="mb-3"
             >
-              {' '}
-              {/* Added currentDivision to key and mb-3 for spacing */}
               <h5 className="text-center mb-3 text-capitalize">{roundKey}</h5>
-              {tournamentData.bracket[
-                roundKey as keyof TournamentDisplayData['bracket']
-              ].map((game) => (
+              {tournamentData.bracket[roundKey].map((userGame) => (
                 <BracketGameDisplay
-                  key={`${currentDivision}-game-${game.id}`}
-                  game={game}
-                  roundName={roundKey as keyof TournamentDisplayData['bracket']}
+                  key={`${currentDivision}-game-${userGame.id}`}
+                  userGame={userGame}
+                  roundName={roundKey}
                 />
               ))}
             </Col>
@@ -1151,7 +1358,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             </div>
           </Card.Body>
         </Card>
-      ) : !viewOnlyUserId ? ( // User's own bracket controls
+      ) : !viewOnlyUserId ? (
         <Card className="mb-4">
           <Card.Header>
             My {currentDivision.toUpperCase()} Bracket Controls
