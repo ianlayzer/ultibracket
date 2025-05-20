@@ -45,6 +45,50 @@ const Navbar = () => {
             <Nav.Link as={Link} to="/scoring">
               Rules & Scoring
             </Nav.Link>
+            <NavDropdown
+              title={'External'}
+              id="navbarDropdownExternal"
+              menuVariant={
+                getNavbarClass().includes('mens') ||
+                getNavbarClass().includes('womens')
+                  ? 'dark'
+                  : 'light'
+              }
+            >
+              <NavDropdown.Item
+                href="https://usaultimate.org/college/schedule/"
+                target="_blank" // Opens in a new tab
+                rel="noopener noreferrer" // Security best practice for target="_blank"
+              >
+                USAU
+              </NavDropdown.Item>
+              <NavDropdown.Item
+                href={
+                  getNavbarClass().includes('mens') ||
+                  getNavbarClass().includes('womens')
+                    ? 'https://play.usaultimate.org/events/2025-USA-Ultimate-College-Championships/schedule/Men/CollegeMen/'
+                    : 'https://play.usaultimate.org/events/2025-USA-Ultimate-College-Championships/schedule/Women/CollegeWomen/'
+                }
+                target="_blank" // Opens in a new tab
+                rel="noopener noreferrer" // Security best practice for target="_blank"
+              >
+                Scorereporter
+              </NavDropdown.Item>
+              <NavDropdown.Item
+                href="https://ultiworld.com/"
+                target="_blank" // Opens in a new tab
+                rel="noopener noreferrer" // Security best practice for target="_blank"
+              >
+                Ultiworld
+              </NavDropdown.Item>
+              <NavDropdown.Item
+                href="https://www.callahanvideos.com"
+                target="_blank" // Opens in a new tab
+                rel="noopener noreferrer" // Security best practice for target="_blank"
+              >
+                callahanvideos
+              </NavDropdown.Item>
+            </NavDropdown>
           </Nav>
           <div className="d-flex align-items-center">
             <ButtonGroup className="me-3">
@@ -80,7 +124,6 @@ const Navbar = () => {
                 <NavDropdown.Item onClick={handleGoogleLogout}>
                   Log Out
                 </NavDropdown.Item>
-                {/* Add other dropdown items here if needed */}
               </NavDropdown>
             ) : (
               <Nav.Link
