@@ -1,0 +1,66 @@
+/* Navbar.css */
+.navbar-mens {
+  background-color: #0047ab !important; /* Cobalt Blue */
+}
+
+.navbar-mens .navbar-brand,
+.navbar-mens .nav-link,
+.navbar-mens .navbar-toggler-icon {
+  /* Target toggler icon color if needed */
+  color: #ffffff !important;
+}
+.navbar-mens .nav-link:hover,
+.navbar-mens .navbar-brand:hover {
+  color: #e0e0e0 !important;
+}
+.navbar-mens .dropdown-toggle {
+  color: #ffffff !important;
+}
+
+.navbar-womens {
+  background-color: #32cc4e !important; /* Dark Orchid */
+}
+
+.navbar-womens .navbar-brand,
+.navbar-womens .nav-link,
+.navbar-womens .navbar-toggler-icon {
+  color: #ffffff !important;
+}
+.navbar-womens .nav-link:hover,
+.navbar-womens .navbar-brand:hover {
+  color: #e0e0e0 !important;
+}
+.navbar-womens .dropdown-toggle {
+  color: #ffffff !important;
+}
+
+/* Ensure dropdown menu under dark navbars is readable */
+.navbar .dropdown-menu {
+  background-color: #f8f9fa; /* Light background for dropdown */
+}
+.navbar .dropdown-item {
+  color: #212529; /* Dark text for dropdown items */
+}
+.navbar .dropdown-item:hover {
+  background-color: #e9ecef;
+}
+
+/* Adjust button group styling for better visibility on colored navbars */
+.navbar .btn-group .btn-light {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #333;
+}
+.navbar .btn-group .btn-light:hover {
+  background-color: #fff;
+}
+
+.navbar .btn-group .btn-outline-light {
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.navbar .btn-group .btn-outline-light:hover {
+  color: #333;
+  background-color: #fff;
+  border-color: #fff;
+}

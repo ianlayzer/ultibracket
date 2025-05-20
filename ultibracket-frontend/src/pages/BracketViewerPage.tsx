@@ -1,12 +1,12 @@
+// src/pages/BracketViewerPage.tsx
 import { useParams } from 'react-router-dom';
-import TournamentView from '../components/TournamentView'; // Adjust path
+import TournamentView from '../components/TournamentView';
 import { Container, Alert } from 'react-bootstrap';
-
-// You might have an AuthContext to get the currently logged-in user
-// import { useAuth } from '../contexts/AuthContext'; // Example
+// import Navbar from '../components/Navbar'; // If needed per page
 
 function BracketViewerPage() {
   const { userId, baseTournamentNameSlug } = useParams<{
+    // This slug is the CORE name
     userId: string;
     baseTournamentNameSlug: string;
   }>();
@@ -20,17 +20,14 @@ function BracketViewerPage() {
       </Container>
     );
   }
-
-  // Decode the slug. If your original names had hyphens, this is a simple approach.
-  // If names are more complex, ensure slugify/deslugify are robust.
-  const tournamentName = decodeURIComponent(baseTournamentNameSlug);
+  const coreTournamentName = decodeURIComponent(baseTournamentNameSlug);
 
   return (
+    // <Navbar />
     <TournamentView
-      viewOnlyUserId={userId} // The user whose bracket to display
-      viewOnlyTournamentName={tournamentName} // The specific tournament
+      viewOnlyUserId={userId}
+      viewOnlyTournamentName={coreTournamentName} // Pass the CORE name
     />
   );
 }
-
 export default BracketViewerPage;
