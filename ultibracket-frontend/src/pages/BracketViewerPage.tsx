@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import TournamentView from '../components/Tournament'; // Adjust path
+import TournamentView from '../components/TournamentView'; // Adjust path
 import { Container, Alert } from 'react-bootstrap';
 
 // You might have an AuthContext to get the currently logged-in user

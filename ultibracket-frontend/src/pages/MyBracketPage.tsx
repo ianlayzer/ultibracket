@@ -1,4 +1,4 @@
-import TournamentView from '../components/Tournament';
+import TournamentView from '../components/TournamentView';
 
 function MyBracketPage() {
   return <TournamentView />;

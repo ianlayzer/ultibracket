@@ -4,13 +4,13 @@ import { Table, Spinner, Alert, Container } from 'react-bootstrap';
 import {
   getAllUserBracketsForTournament,
   UserBracketPicks as FirebaseUserBracketPicksType,
-  getMasterTournament, // Add this
+  getMasterTournament,
   Tournament as FirebaseTournamentType,
-} from './../firebase/FirebaseUtils'; // Adjust path as needed
+} from './../firebase/FirebaseUtils';
 import {
   calculateBracketScoresAgainstMaster,
   MAX_POSSIBLE_POINTS_NEW_SYSTEM,
-} from './../utils/scoreUtils'; // Adjust path as needed
+} from './../utils/scoreUtils';
 
 const MASTER_TOURNAMENT_ID_FOR_SCORING = 'MASTER_BRACKET_USAU_2025';
 
@@ -52,7 +52,7 @@ function LeaderboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [maxPointsForDisplay, setMaxPointsForDisplay] = useState<number>(
     MAX_POSSIBLE_POINTS_NEW_SYSTEM,
-  ); // For table header
+  );
   const [sortBy, setSortBy] = useState<SortableColumn>('calculatedScore');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 

@@ -1,3 +1,4 @@
+// TournamentView.tsx
 import {
   Card,
   Badge,
@@ -8,21 +9,24 @@ import {
   Spinner,
   Toast,
   ToastContainer,
-  Form, // Added Form
-  Alert, // Added Alert
+  Form,
+  Alert,
 } from 'react-bootstrap';
 import { useState, useEffect } from 'react';
 import './Tournament.css';
-// Updated import path and functions
 import {
   saveUserBracketPicks,
   getUserBracketPicks,
-  Tournament as FirebaseTournamentType, // Use aliased type
+  Tournament as FirebaseTournamentType,
   getMasterTournament,
-  saveMasterTournament, // Use aliased type
+  saveMasterTournament,
   deleteMasterTournament,
-} from './../firebase/FirebaseUtils';
-import { useAuth } from '../firebase/useAuth';
+} from './../firebase/FirebaseUtils'; // Adjust path as needed
+import { useAuth } from '../firebase/useAuth'; // Adjust path as needed
+import {
+  calculateBracketScoresAgainstMaster,
+  MAX_POSSIBLE_POINTS_NEW_SYSTEM,
+} from './../utils/scoreUtils'; // Adjust path as needed
 
 // Type definitions
 interface Team {
@@ -41,13 +45,12 @@ interface BracketGame {
   id: number;
   team1: string;
   team2: string;
-  score: string; // Score might not be relevant for user predictions, but kept for structure
+  score: string;
   winner: string | null;
 }
 
-// This is the structure for the base tournament and user's manipulated version
 interface TournamentDisplayData {
-  name: string; // Base tournament name
+  name: string; // Base tournament name for user brackets, or identifier for master
   pools: {
     [key: string]: PoolTeam[];
   };
@@ -59,25 +62,23 @@ interface TournamentDisplayData {
   };
 }
 
-// Helper function to extract team name without seed
-const getTeamName = (fullTeamString: string) => {
-  if (fullTeamString === 'TBD') return 'TBD';
+// Helper functions
+const getTeamName = (fullTeamString: string): string => {
+  if (!fullTeamString || fullTeamString === 'TBD') return 'TBD';
   return fullTeamString.replace(/\s*\(\d+\)$/, '');
 };
 
-// Helper function to extract seed
-const getSeed = (fullTeamString: string) => {
-  if (fullTeamString === 'TBD') return null;
+const getSeed = (fullTeamString: string): number | null => {
+  if (!fullTeamString || fullTeamString === 'TBD') return null;
   const match = fullTeamString.match(/\((\d+)\)$/);
   return match ? parseInt(match[1]) : null;
 };
 
-// Helper function to format team string
-const formatTeamString = (team: Team) => {
+const formatTeamString = (team: Team): string => {
   return `${team.name} (${team.seed})`;
 };
 
-// Function to create pools based on teams
+// Data creation functions
 const createPools = (teams: Team[]): { [key: string]: PoolTeam[] } => {
   const sortedTeams = [...teams].sort((a, b) => a.seed - b.seed);
   const pools: { [key: string]: PoolTeam[] } = {
@@ -86,7 +87,6 @@ const createPools = (teams: Team[]): { [key: string]: PoolTeam[] } => {
     'Pool C': [],
     'Pool D': [],
   };
-
   if (sortedTeams.length < 20) {
     console.warn(
       'Not enough teams to fill pools according to the defined structure.',
@@ -97,7 +97,6 @@ const createPools = (teams: Team[]): { [key: string]: PoolTeam[] } => {
     });
     return pools;
   }
-
   pools['Pool A'].push(createPoolTeam(sortedTeams[0]));
   pools['Pool B'].push(createPoolTeam(sortedTeams[1]));
   pools['Pool C'].push(createPoolTeam(sortedTeams[2]));
@@ -110,14 +109,14 @@ const createPools = (teams: Team[]): { [key: string]: PoolTeam[] } => {
   pools['Pool C'].push(createPoolTeam(sortedTeams[9]));
   pools['Pool B'].push(createPoolTeam(sortedTeams[10]));
   pools['Pool A'].push(createPoolTeam(sortedTeams[11]));
-  pools['Pool A'].push(createPoolTeam(sortedTeams[16])); // Seed 17
-  pools['Pool B'].push(createPoolTeam(sortedTeams[13])); // Seed 14
-  pools['Pool C'].push(createPoolTeam(sortedTeams[14])); // Seed 15
-  pools['Pool D'].push(createPoolTeam(sortedTeams[15])); // Seed 16
-  pools['Pool A'].push(createPoolTeam(sortedTeams[12])); // Seed 13
-  pools['Pool B'].push(createPoolTeam(sortedTeams[17])); // Seed 18
-  pools['Pool C'].push(createPoolTeam(sortedTeams[18])); // Seed 19
-  pools['Pool D'].push(createPoolTeam(sortedTeams[19])); // Seed 20
+  pools['Pool A'].push(createPoolTeam(sortedTeams[16]));
+  pools['Pool B'].push(createPoolTeam(sortedTeams[13]));
+  pools['Pool C'].push(createPoolTeam(sortedTeams[14]));
+  pools['Pool D'].push(createPoolTeam(sortedTeams[15]));
+  pools['Pool A'].push(createPoolTeam(sortedTeams[12]));
+  pools['Pool B'].push(createPoolTeam(sortedTeams[17]));
+  pools['Pool C'].push(createPoolTeam(sortedTeams[18]));
+  pools['Pool D'].push(createPoolTeam(sortedTeams[19]));
   return pools;
 };
 
@@ -159,23 +158,18 @@ const createEmptyBracket = (): TournamentDisplayData['bracket'] => ({
   final: [{ id: 11, team1: 'TBD', team2: 'TBD', score: '0 - 0', winner: null }],
 });
 
-const populateBracketFromPools = (
-  pools: { [key: string]: PoolTeam[] },
-  // currentBracket?: TournamentDisplayData['bracket'], // We will always create a fresh bracket from pools
-) => {
-  const newBracket = createEmptyBracket(); // Always start with a fresh empty bracket
-
+const populateBracketFromPools = (pools: {
+  [key: string]: PoolTeam[];
+}): TournamentDisplayData['bracket'] => {
+  const newBracket = createEmptyBracket();
   const poolA = pools['Pool A']?.slice(0, 3) || [];
   const poolB = pools['Pool B']?.slice(0, 3) || [];
   const poolC = pools['Pool C']?.slice(0, 3) || [];
   const poolD = pools['Pool D']?.slice(0, 3) || [];
-
-  // Mark teams as advanced in pools (visual cue)
   Object.values(pools).forEach((poolTeams) => {
-    poolTeams.forEach((pt) => (pt.advanced = false)); // Reset first
+    poolTeams.forEach((pt) => (pt.advanced = false));
   });
   [...poolA, ...poolB, ...poolC, ...poolD].forEach((pt) => {
-    // Find the team in the original pools structure and mark it
     for (const poolName in pools) {
       const teamInPool = pools[poolName].find(
         (poolTeam) => poolTeam.team === pt.team,
@@ -186,12 +180,10 @@ const populateBracketFromPools = (
       }
     }
   });
-
   newBracket.quarters[0].team1 = poolA[0]?.team || 'TBD';
   newBracket.quarters[1].team1 = poolD[0]?.team || 'TBD';
   newBracket.quarters[2].team1 = poolC[0]?.team || 'TBD';
   newBracket.quarters[3].team1 = poolB[0]?.team || 'TBD';
-
   newBracket.prequarters[0].team1 = poolA[1]?.team || 'TBD';
   newBracket.prequarters[0].team2 = poolD[2]?.team || 'TBD';
   newBracket.prequarters[1].team1 = poolB[1]?.team || 'TBD';
@@ -200,7 +192,6 @@ const populateBracketFromPools = (
   newBracket.prequarters[2].team2 = poolB[2]?.team || 'TBD';
   newBracket.prequarters[3].team1 = poolD[1]?.team || 'TBD';
   newBracket.prequarters[3].team2 = poolA[2]?.team || 'TBD';
-
   return newBracket;
 };
 
@@ -236,24 +227,14 @@ const defaultTeams: Team[] = [
   { name: 'Ottawa', seed: 20 },
 ];
 
-const POINTS_PER_ROUND = {
-  prequarters: 10,
-  quarters: 20,
-  semis: 40,
-  final: 80,
-};
-const MAX_POSSIBLE_POINTS =
-  4 * POINTS_PER_ROUND.prequarters +
-  4 * POINTS_PER_ROUND.quarters +
-  2 * POINTS_PER_ROUND.semis +
-  1 * POINTS_PER_ROUND.final;
+const MASTER_TOURNAMENT_ID_FOR_SCORING = 'MASTER_BRACKET_USAU_2025';
 
 interface TournamentViewProps {
   teams?: Team[];
-  baseTournamentName?: string; // Used for user brackets or as the ID for master bracket
+  baseTournamentName?: string;
   viewOnlyUserId?: string;
   viewOnlyTournamentName?: string;
-  isMasterBracket?: boolean; // New prop
+  isMasterBracket?: boolean;
 }
 
 const TournamentView: React.FC<TournamentViewProps> = ({
@@ -264,14 +245,13 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   viewOnlyTournamentName,
   isMasterBracket = false,
 }) => {
-  const { user } = useAuth(); // Current logged-in user, could be admin for master bracket
-
+  const { user } = useAuth(); // Assume useAuth provides authLoading
   const masterBracketIdentifier = isMasterBracket ? propBaseTournamentName : '';
 
   const [tournamentData, setTournamentData] =
     useState<TournamentDisplayData | null>(null);
   const [userBracketName, setUserBracketName] = useState<string>(
-    isMasterBracket ? 'Master Results Bracket' : '', // Default for master
+    isMasterBracket ? masterBracketIdentifier : '',
   );
   const [draggedTeam, setDraggedTeam] = useState<{
     poolName: string;
@@ -285,91 +265,80 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isEditing, setIsEditing] = useState<boolean>(
-    isMasterBracket ? true : !viewOnlyUserId, // Master is always editable, others depend on viewOnlyUserId
+    isMasterBracket ? true : !viewOnlyUserId,
   );
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
-
-  const effectiveUserIdForUserBracket = !isMasterBracket
-    ? viewOnlyUserId || user?.uid
-    : undefined;
-  const effectiveBaseTournamentNameForUserBracket = !isMasterBracket
-    ? viewOnlyTournamentName || propBaseTournamentName
-    : undefined;
-  const isViewingSomeoneElse =
-    !isMasterBracket &&
-    !!viewOnlyUserId &&
-    (!user || viewOnlyUserId !== user.uid);
 
   const [countdown, setCountdown] = useState<string>('');
   const [isLocked, setIsLocked] = useState<boolean>(false);
 
   const [currentScore, setCurrentScore] = useState<number>(0);
   const [possiblePointsRemaining, setPossiblePointsRemaining] =
-    useState<number>(MAX_POSSIBLE_POINTS);
+    useState<number>(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
+  const [maxPointsForDisplay, setMaxPointsForDisplay] = useState<number>(
+    MAX_POSSIBLE_POINTS_NEW_SYSTEM,
+  );
+  const [masterBracketForScoring, setMasterBracketForScoring] =
+    useState<FirebaseTournamentType | null>(null);
+  const [isLoadingMasterForScoring, setIsLoadingMasterForScoring] =
+    useState<boolean>(!isMasterBracket);
 
   useEffect(() => {
-    const initialize = async () => {
-      setIsLoading(true);
-      setErrorLoading(null);
-
+    const loadMainBracketData = async () => {
       if (isMasterBracket) {
         if (!masterBracketIdentifier) {
           setErrorLoading('Master bracket identifier is missing.');
-          setIsLoading(false);
+          setTournamentData(null);
           return;
         }
         try {
-          const masterTournamentData = await getMasterTournament(
+          const masterTournamentDataFirebase = await getMasterTournament(
             masterBracketIdentifier,
           );
-          if (masterTournamentData) {
-            setTournamentData(masterTournamentData); // getMasterTournament returns Tournament type
+          if (masterTournamentDataFirebase) {
+            setTournamentData(masterTournamentDataFirebase);
             setUserBracketName(
-              masterTournamentData.name || 'Master Results Bracket',
-            ); // Use its actual name or default
-            // Determine if bracket was populated
+              masterTournamentDataFirebase.name || masterBracketIdentifier,
+            );
             const hasPicks =
-              masterTournamentData.bracket.prequarters.some(
+              masterTournamentDataFirebase.bracket.prequarters.some(
                 (g) => g.team1 !== 'TBD',
               ) ||
-              masterTournamentData.bracket.quarters.some(
+              masterTournamentDataFirebase.bracket.quarters.some(
                 (g) => g.team1 !== 'TBD',
               );
             setBracketGeneratedFromPools(hasPicks);
           } else {
-            // Create new master bracket structure if it doesn't exist
             setTournamentData(
               createTournamentData(teams, masterBracketIdentifier),
             );
-            setUserBracketName(masterBracketIdentifier); // Or a more descriptive name
+            setUserBracketName(masterBracketIdentifier);
             setBracketGeneratedFromPools(false);
           }
-          setIsEditing(true); // Master bracket always editable by admin
+          setIsEditing(true);
         } catch (error) {
           console.error('Error loading master bracket:', error);
           setErrorLoading(
             `Failed to load master bracket. ${(error as Error).message}`,
           );
-        } finally {
-          setIsLoading(false);
+          setTournamentData(null);
         }
       } else {
-        // Logic for User Brackets
-        if (
-          !effectiveUserIdForUserBracket ||
-          !effectiveBaseTournamentNameForUserBracket
-        ) {
+        const currentUID = viewOnlyUserId || user?.uid;
+        const currentBaseName =
+          viewOnlyTournamentName || propBaseTournamentName;
+
+        if (!currentUID || !currentBaseName) {
           setErrorLoading(
             'Required information (user or tournament) is missing to display the bracket.',
           );
-          setIsLoading(false);
           setTournamentData(null);
           return;
         }
         try {
           const savedUserPicks = await getUserBracketPicks(
-            effectiveUserIdForUserBracket,
-            effectiveBaseTournamentNameForUserBracket,
+            currentUID,
+            currentBaseName,
           );
           if (savedUserPicks) {
             setTournamentData(savedUserPicks.tournamentData);
@@ -384,16 +353,16 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             setBracketGeneratedFromPools(hasPicks);
             setIsEditing(false);
           } else {
-            if (isViewingSomeoneElse) {
+            const isOwnBracket = user?.uid === currentUID;
+            if (viewOnlyUserId && !isOwnBracket) {
+              // Viewing someone else's bracket and it's not found
               setErrorLoading(`Bracket not found for the specified user.`);
               setTournamentData(null);
-            } else if (
-              user?.uid === effectiveUserIdForUserBracket &&
-              !isLocked
-            ) {
+            } else if (isOwnBracket && !isLocked) {
+              // Own bracket, not found, not locked
               const newTournament = createTournamentData(
                 teams,
-                effectiveBaseTournamentNameForUserBracket,
+                currentBaseName,
               );
               setTournamentData(newTournament);
               setUserBracketName(
@@ -402,15 +371,11 @@ const TournamentView: React.FC<TournamentViewProps> = ({
               setIsEditing(true);
               setBracketGeneratedFromPools(false);
             } else {
+              // Viewing own bracket but it's locked, or other unhandled case for non-existent bracket
               setErrorLoading(
-                'Cannot create new bracket (locked, no user, or viewing other).',
+                'Cannot create or view this bracket (it may not exist, or is locked).',
               );
-              setTournamentData(
-                createTournamentData(
-                  teams,
-                  effectiveBaseTournamentNameForUserBracket,
-                ),
-              );
+              setTournamentData(createTournamentData(teams, currentBaseName)); // Show empty structure for context
               setIsEditing(false);
             }
           }
@@ -420,31 +385,59 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             `Failed to load bracket data. ${(error as Error).message}`,
           );
           setTournamentData(null);
-        } finally {
-          setIsLoading(false);
         }
       }
     };
-    initialize();
+
+    const initializeComponent = async () => {
+      setIsLoading(true);
+      setErrorLoading(null);
+
+      if (!isMasterBracket && user === undefined) {
+        return; // Wait for auth state to resolve for user brackets
+      }
+
+      let masterForScoringLoadPromise: Promise<void> = Promise.resolve();
+      if (!isMasterBracket) {
+        setIsLoadingMasterForScoring(true);
+        masterForScoringLoadPromise = getMasterTournament(
+          MASTER_TOURNAMENT_ID_FOR_SCORING,
+        )
+          .then((master) => {
+            setMasterBracketForScoring(master);
+          })
+          .catch((e) => {
+            console.error('Failed to load master bracket for scoring:', e);
+            setMasterBracketForScoring(null);
+          })
+          .finally(() => {
+            setIsLoadingMasterForScoring(false);
+          });
+      }
+
+      await loadMainBracketData();
+      await masterForScoringLoadPromise;
+      setIsLoading(false);
+    };
+
+    initializeComponent();
   }, [
     teams,
-    propBaseTournamentName, // For user brackets, this is the base
-    user, // For user brackets
-    viewOnlyUserId, // For user brackets
-    viewOnlyTournamentName, // For user brackets
-    isLocked, // For user brackets
-    isMasterBracket, // New dependency
-    masterBracketIdentifier, // For master bracket
+    propBaseTournamentName,
+    user,
+    viewOnlyUserId,
+    viewOnlyTournamentName,
+    isLocked,
+    isMasterBracket,
+    masterBracketIdentifier,
   ]);
 
   useEffect(() => {
     if (isMasterBracket) {
-      setIsLocked(false); // Master bracket never locks
+      setIsLocked(false);
       setCountdown('Master bracket - Always Unlocked');
-      return; // No interval needed
+      return;
     }
-
-    // Existing countdown logic for user brackets
     const calculateCountdown = () => {
       const lockDate = new Date('2025-05-23T17:30:00Z');
       const now = new Date();
@@ -452,7 +445,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       if (diff <= 0) {
         setCountdown('Bracket Locked!');
         setIsLocked(true);
-        if (!isViewingSomeoneElse) setIsEditing(false);
+        if (!viewOnlyUserId && user?.uid === (viewOnlyUserId || user?.uid))
+          setIsEditing(false); // Only affect editing if it's their own bracket
         return;
       }
       const d = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -467,42 +461,59 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     return () => clearInterval(intervalId);
   }, [
     isMasterBracket,
-    isViewingSomeoneElse,
+    viewOnlyUserId,
+    user,
     setIsLocked,
     setCountdown,
     setIsEditing,
-  ]);
+  ]); // Added user and viewOnlyUserId
 
   useEffect(() => {
     if (tournamentData?.bracket) {
-      let score = 0;
-      const rounds: (keyof TournamentDisplayData['bracket'])[] = [
-        'prequarters',
-        'quarters',
-        'semis',
-        'final',
-      ];
-      rounds.forEach((roundName) => {
-        tournamentData.bracket[roundName].forEach((game) => {
-          if (game.winner) score += POINTS_PER_ROUND[roundName];
-        });
-      });
-      setCurrentScore(score);
-      setPossiblePointsRemaining(MAX_POSSIBLE_POINTS - score);
       const finalGame = tournamentData.bracket.final[0];
       setIsBracketComplete(!!finalGame?.winner);
     } else {
-      setCurrentScore(0);
-      setPossiblePointsRemaining(MAX_POSSIBLE_POINTS);
       setIsBracketComplete(false);
     }
-  }, [tournamentData]);
 
-  if (isLoading) {
+    if (
+      !isMasterBracket &&
+      tournamentData?.bracket &&
+      !isLoadingMasterForScoring
+    ) {
+      const scores = calculateBracketScoresAgainstMaster(
+        tournamentData.bracket,
+        masterBracketForScoring,
+      );
+      setCurrentScore(scores.currentScore);
+      setPossiblePointsRemaining(scores.possiblePointsRemaining);
+      setMaxPointsForDisplay(scores.maxPoints);
+    } else if (isMasterBracket) {
+      setCurrentScore(0);
+      setPossiblePointsRemaining(0);
+      setMaxPointsForDisplay(0);
+    } else {
+      setCurrentScore(0);
+      setPossiblePointsRemaining(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
+      setMaxPointsForDisplay(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
+    }
+  }, [
+    tournamentData,
+    isMasterBracket,
+    masterBracketForScoring,
+    isLoadingMasterForScoring,
+  ]);
+
+  const isOverallLoading =
+    isLoading ||
+    (!isMasterBracket && user === undefined) ||
+    (!isMasterBracket && isLoadingMasterForScoring);
+
+  if (isOverallLoading) {
     return (
       <Container className="text-center mt-5">
         <Spinner animation="border" />
-        <p>Loading Bracket...</p>
+        <p>Loading Bracket Data...</p>
       </Container>
     );
   }
@@ -513,63 +524,42 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       </Container>
     );
   }
-  if (!tournamentData && !isEditing) {
-    return (
-      <Container className="mt-4">
-        <Alert variant="warning">Bracket data is unavailable.</Alert>
-      </Container>
-    );
-  }
   if (!tournamentData) {
-    if (isEditing && user && !isViewingSomeoneElse) {
-      return (
-        <Container className="text-center mt-5">
-          <Spinner animation="border" />
-          <p>Initializing new bracket...</p>
-        </Container>
-      );
-    }
     return (
       <Container className="mt-4">
         <Alert variant="danger">
-          Critical error: Bracket data could not be initialized.
+          Bracket data could not be prepared or is unavailable.
         </Alert>
       </Container>
     );
   }
 
   const handleDragStart = (poolName: string, index: number) => {
-    if (!isEditing || isLocked || isViewingSomeoneElse) return; // Allow drag if editing own bracket
+    const canDrag =
+      isEditing && (isMasterBracket || !isLocked) && !viewOnlyUserId;
+    if (!canDrag) return;
     setDraggedTeam({ poolName, index });
   };
-
   const handleDragOver = (e: React.DragEvent) => {
-    if (!isEditing || isLocked || isViewingSomeoneElse) return;
+    const canDrag =
+      isEditing && (isMasterBracket || !isLocked) && !viewOnlyUserId;
+    if (!canDrag) return;
     e.preventDefault();
   };
-
   const handleDrop = (poolName: string, index: number) => {
-    if (
-      !isEditing ||
-      isLocked ||
-      isViewingSomeoneElse ||
-      !draggedTeam ||
-      draggedTeam.poolName !== poolName
-    ) {
+    const canDrop =
+      isEditing && (isMasterBracket || !isLocked) && !viewOnlyUserId;
+    if (!canDrop || !draggedTeam || draggedTeam.poolName !== poolName) {
       setDraggedTeam(null);
       return;
     }
-
-    const newTournamentData = { ...tournamentData }; // Shallow copy tournamentData
+    const newTournamentData = { ...tournamentData };
     newTournamentData.pools = JSON.parse(
       JSON.stringify(newTournamentData.pools),
-    ); // Deep copy pools
-
+    );
     const pool = newTournamentData.pools[poolName];
     const [movedTeam] = pool.splice(draggedTeam.index, 1);
     pool.splice(index, 0, movedTeam);
-
-    // Pool order changed, so bracket needs regeneration and picks are invalid
     newTournamentData.bracket = createEmptyBracket();
     setTournamentData(newTournamentData);
     setBracketGeneratedFromPools(false);
@@ -577,16 +567,14 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   };
 
   const generateBracket = () => {
-    if (!isEditing || isLocked || isViewingSomeoneElse) return;
-
-    // Create a deep copy of pools to pass to populateBracketFromPools
-    // and to ensure 'advanced' status is correctly updated on a fresh copy for display
+    const canGenerate =
+      isEditing && (isMasterBracket || !isLocked) && !viewOnlyUserId;
+    if (!canGenerate) return;
     const currentPoolsCopy = JSON.parse(JSON.stringify(tournamentData.pools));
     const newBracket = populateBracketFromPools(currentPoolsCopy);
-
     setTournamentData((prev) => ({
       ...prev!,
-      pools: currentPoolsCopy, // Use the modified copy of pools
+      pools: currentPoolsCopy,
       bracket: newBracket,
     }));
     setBracketGeneratedFromPools(true);
@@ -597,14 +585,12 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     gameId: number,
     teamNumber: 1 | 2,
   ) => {
-    if (
-      !isEditing ||
-      isLocked ||
-      !bracketGeneratedFromPools ||
-      isViewingSomeoneElse
-    )
-      return;
-
+    const canClick =
+      isEditing &&
+      (isMasterBracket || !isLocked) &&
+      !viewOnlyUserId &&
+      bracketGeneratedFromPools;
+    if (!canClick) return;
     setTournamentData((prevData) => {
       if (!prevData) return null;
       const newTournamentData = JSON.parse(
@@ -616,7 +602,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       if (!game) return newTournamentData;
       const selectedTeam = teamNumber === 1 ? game.team1 : game.team2;
       if (selectedTeam === 'TBD') return newTournamentData;
-
       if (game.winner === selectedTeam) {
         game.winner = null;
         clearNextRound(
@@ -647,7 +632,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     let nextRoundKey: keyof TournamentDisplayData['bracket'] | null = null;
     let nextGameId: number | null = null;
     let teamPosInNextGame: 1 | 2 | null = null;
-
     if (currentRound === 'prequarters') {
       nextRoundKey = 'quarters';
       const pqMap = [
@@ -686,7 +670,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         teamPosInNextGame = mapping.pos as 1 | 2;
       }
     }
-
     if (nextRoundKey && nextGameId !== null && teamPosInNextGame !== null) {
       const nextGame = bracket[nextRoundKey].find((g) => g.id === nextGameId);
       if (nextGame) {
@@ -694,19 +677,16 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           teamPosInNextGame === 1 ? nextGame.team1 : nextGame.team2;
         if (teamPosInNextGame === 1) nextGame.team1 = winner;
         else nextGame.team2 = winner;
-
-        // If the team in the slot changed, or if there was a winner, clear subsequent winner
         if (oldTeamInNextSlot !== winner || nextGame.winner) {
           const oldWinnerOfNextGame = nextGame.winner;
           nextGame.winner = null;
-          if (oldWinnerOfNextGame) {
+          if (oldWinnerOfNextGame)
             clearNextRound(
               bracket,
               nextRoundKey,
               nextGame.id,
               oldWinnerOfNextGame,
             );
-          }
         }
       }
     }
@@ -720,7 +700,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   ) => {
     let nextRoundKey: keyof TournamentDisplayData['bracket'] | null = null;
     let nextGameId: number | null = null;
-
     if (currentRound === 'prequarters') {
       nextRoundKey = 'quarters';
       const mapping = [
@@ -743,7 +722,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       nextRoundKey = 'final';
       nextGameId = 11;
     }
-
     if (nextRoundKey && nextGameId) {
       const nextGame = bracket[nextRoundKey].find((g) => g.id === nextGameId);
       if (nextGame) {
@@ -756,36 +734,34 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           nextGame.team2 = 'TBD';
           teamSlotChanged = true;
         }
-
         if (teamSlotChanged || nextGame.winner) {
           const oldWinnerOfNextGame = nextGame.winner;
           nextGame.winner = null;
-          if (oldWinnerOfNextGame) {
-            // If this game itself had a winner that depended on teamThatNoLongerAdvances
+          if (oldWinnerOfNextGame)
             clearNextRound(
               bracket,
               nextRoundKey,
               nextGame.id,
               oldWinnerOfNextGame,
             );
-          }
         }
       }
     }
   };
 
   const handleSavePicks = async () => {
-    if (!tournamentData || (!user && !isMasterBracket)) {
-      // Master bracket might not need a specific user if admin role is implicit
-      setSaveMessage('Cannot save. Data missing or not authorized.');
+    if (!tournamentData) {
+      setSaveMessage('No tournament data to save.');
       setShowSaveToast(true);
       return;
     }
-
-    if (!isMasterBracket && (!user || !user.uid || isLocked)) {
-      setSaveMessage(
-        'Cannot save user bracket. Bracket might be locked or user data missing.',
-      );
+    if (!isMasterBracket && (!user || !user.uid)) {
+      setSaveMessage('User not logged in.');
+      setShowSaveToast(true);
+      return;
+    }
+    if (!isMasterBracket && isLocked) {
+      setSaveMessage('Cannot save user bracket, it is locked.');
       setShowSaveToast(true);
       return;
     }
@@ -794,7 +770,6 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       setShowSaveToast(true);
       return;
     }
-
     if (!bracketGeneratedFromPools) {
       setSaveMessage(
         'Please populate the bracket from pool rankings before saving.',
@@ -802,33 +777,26 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       setShowSaveToast(true);
       return;
     }
-
     setIsSaving(true);
     setSaveMessage(null);
-
     const dataToSave: FirebaseTournamentType = {
-      name: isMasterBracket ? masterBracketIdentifier : userBracketName, // For master, its name is its ID/baseTournamentName
+      name: tournamentData.name, // This is the base tournament name
       pools: tournamentData.pools,
       bracket: tournamentData.bracket,
-      // champion will be derived if final game has a winner
     };
-    // Ensure champion is set
     const finalGame = tournamentData.bracket.final[0];
     dataToSave.champion = finalGame?.winner || undefined;
 
     try {
       if (isMasterBracket) {
-        // Use masterBracketIdentifier as the tournament name for saving master data
         await saveMasterTournament({
           ...dataToSave,
           name: masterBracketIdentifier,
-        });
+        }); // Master uses its ID as its "name"
         setSaveMessage(
           `Master bracket "${masterBracketIdentifier}" saved successfully!`,
         );
-        // setIsEditing(true); // Master stays editable
       } else if (user && user.uid) {
-        // Saving a user bracket
         await saveUserBracketPicks(
           user.uid,
           tournamentData.name,
@@ -838,7 +806,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         setSaveMessage(`Bracket "${userBracketName}" saved successfully!`);
         setIsEditing(false);
       } else {
-        throw new Error('Cannot determine save type (master or user).');
+        throw new Error('Cannot determine save type or user missing.');
       }
     } catch (error) {
       console.error('Error saving bracket:', error);
@@ -849,13 +817,50 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     }
   };
 
+  const handleDeleteMasterBracket = async () => {
+    if (!isMasterBracket || !masterBracketIdentifier) {
+      setSaveMessage(
+        'This action is only for master brackets and requires an identifier.',
+      );
+      setShowSaveToast(true);
+      return;
+    }
+    const confirmDelete = window.confirm(
+      `Are you sure you want to permanently delete the master bracket "${masterBracketIdentifier}"? This action cannot be undone.`,
+    );
+    if (!confirmDelete) return;
+    setIsSaving(true);
+    setSaveMessage(null);
+    try {
+      await deleteMasterTournament(masterBracketIdentifier);
+      setSaveMessage(
+        `Master bracket "${masterBracketIdentifier}" deleted successfully. You can recreate it by saving again.`,
+      );
+      setShowSaveToast(true);
+      setTournamentData(createTournamentData(teams, masterBracketIdentifier));
+      setUserBracketName(masterBracketIdentifier);
+      setBracketGeneratedFromPools(false);
+      setIsBracketComplete(false);
+    } catch (error) {
+      console.error('Error deleting master bracket:', error);
+      setSaveMessage(
+        `Failed to delete master bracket. ${(error as Error).message}`,
+      );
+      setShowSaveToast(true);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const canEditPools =
-    isEditing && !isViewingSomeoneElse && (isMasterBracket || !isLocked);
-  const canClickBracket =
     isEditing &&
-    bracketGeneratedFromPools &&
-    !isViewingSomeoneElse &&
-    (isMasterBracket || !isLocked);
+    (isMasterBracket || !isLocked) &&
+    (!viewOnlyUserId || user?.uid === viewOnlyUserId);
+  const canClickBracketTeams =
+    isEditing &&
+    (isMasterBracket || !isLocked) &&
+    (!viewOnlyUserId || user?.uid === viewOnlyUserId) &&
+    bracketGeneratedFromPools;
 
   const renderPoolStandings = () => (
     <div className="mt-4">
@@ -870,7 +875,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                 <div className="pool-teams-container">
                   {(poolTeams || []).map((team, index) => (
                     <div
-                      key={team.team + index} // Ensure unique key if team names can repeat across reorders
+                      key={team.team + '-' + index}
                       className={`pool-team-item ${team.advanced && bracketGeneratedFromPools ? 'pool-team-advanced' : ''}`}
                       draggable={canEditPools}
                       onDragStart={() => handleDragStart(poolName, index)}
@@ -894,22 +899,24 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           </Col>
         ))}
       </Row>
-      {isEditing &&
-        !isLocked &&
-        !isViewingSomeoneElse && ( // Only show button if editing own bracket
-          <div className="d-flex justify-content-center mt-3 mb-5">
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={generateBracket}
-              disabled={bracketGeneratedFromPools} // Disable if already populated
-            >
-              {bracketGeneratedFromPools
-                ? 'Bracket Populated'
-                : 'Populate Bracket from Pool Rankings'}
-            </Button>
-          </div>
-        )}
+      {(isMasterBracket
+        ? isEditing
+        : isEditing &&
+          !isLocked &&
+          (!viewOnlyUserId || user?.uid === viewOnlyUserId)) && (
+        <div className="d-flex justify-content-center mt-3 mb-5">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={generateBracket}
+            disabled={bracketGeneratedFromPools}
+          >
+            {bracketGeneratedFromPools
+              ? 'Bracket Populated'
+              : 'Populate Bracket from Pool Rankings'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 
@@ -926,8 +933,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     const seed2 = getSeed(game.team2);
     const isWinner1 = game.winner === game.team1 && game.team1 !== 'TBD';
     const isWinner2 = game.winner === game.team2 && game.team2 !== 'TBD';
-    const clickable = canClickBracket;
-
+    const clickable = canClickBracketTeams;
     return (
       <div className="bracket-game mb-4">
         <div
@@ -985,19 +991,23 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         </Row>
       </div>
       {bracketGeneratedFromPools &&
-        isEditing &&
-        !isLocked &&
-        !isViewingSomeoneElse && (
+        (isMasterBracket
+          ? isEditing
+          : isEditing &&
+            !isLocked &&
+            (!viewOnlyUserId || user?.uid === viewOnlyUserId)) && (
           <p className="text-center text-muted mt-2">
             Click on a team to advance them. Click again to deselect.
           </p>
         )}
       {isBracketComplete &&
-        (!isEditing || isViewingSomeoneElse) && ( // Show completed message if not editing OR if viewing someone else
+        (isMasterBracket || !isEditing || viewOnlyUserId) && (
           <Alert variant="success" className="text-center mt-3">
-            {!isViewingSomeoneElse
-              ? 'Your bracket is complete!'
-              : 'Bracket is complete.'}
+            {isMasterBracket
+              ? 'Master Bracket Complete!'
+              : !viewOnlyUserId
+                ? 'Your bracket is complete!'
+                : 'Bracket is complete.'}
             Champion:{' '}
             <strong>
               {getTeamName(tournamentData.bracket.final[0].winner!)}
@@ -1007,62 +1017,68 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     </div>
   );
 
-  const handleDeleteMasterBracket = async () => {
-    if (!isMasterBracket || !masterBracketIdentifier) {
-      setSaveMessage(
-        'This action is only for master brackets and requires an identifier.',
-      );
-      setShowSaveToast(true);
-      return;
-    }
-
-    setIsSaving(true); // Use isSaving to disable buttons during operation
-    setSaveMessage(null);
-
-    try {
-      await deleteMasterTournament(masterBracketIdentifier);
-      setSaveMessage(
-        `Master bracket "${masterBracketIdentifier}" deleted successfully. You can recreate it by saving again.`,
-      );
-      setShowSaveToast(true);
-      // Reset local state to an empty master bracket structure
-      setTournamentData(createTournamentData(teams, masterBracketIdentifier));
-      setUserBracketName(masterBracketIdentifier); // Or 'Master Results Bracket'
-      setBracketGeneratedFromPools(false);
-      setIsBracketComplete(false);
-    } catch (error) {
-      console.error('Error deleting master bracket:', error);
-      setSaveMessage(
-        `Failed to delete master bracket. ${(error as Error).message}`,
-      );
-      setShowSaveToast(true);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
     <Container className="mt-4">
       <div className="bg-primary text-white py-3 mb-4 border rounded">
         <Container>
           <h2 className="text-center mb-0">
-            {isMasterBracket ? masterBracketIdentifier : tournamentData.name}
+            {isMasterBracket
+              ? masterBracketIdentifier
+              : tournamentData.name || 'Tournament'}
           </h2>
           {isMasterBracket && (
             <p className="text-center mb-0 small">
-              MASTER RESULTS BRACKET (Admin)
+              ADMIN VIEW - THIS IS THE TRUE RESULTS BRACKET
             </p>
           )}
-          {!isMasterBracket && isViewingSomeoneElse && userBracketName && (
+          {!isMasterBracket && viewOnlyUserId && userBracketName && (
             <p className="text-center mb-0 small">Viewing: {userBracketName}</p>
           )}
-          {!isMasterBracket && !isViewingSomeoneElse && user && (
-            <p className="text-center mb-0 small">My Bracket ({user.email})</p>
+          {!isMasterBracket && !viewOnlyUserId && user && (
+            <p className="text-center mb-0 small">
+              My Bracket ({user.email || 'User'})
+            </p>
           )}
         </Container>
       </div>
 
-      {!isViewingSomeoneElse && (
+      {isMasterBracket ? (
+        <Card className="mb-4">
+          <Card.Header>Master Bracket Controls</Card.Header>
+          <Card.Body className="text-center">
+            <p className="mb-3">
+              Edit pools and bracket below. Changes here define the official
+              results for scoring.
+            </p>
+            <div className="d-grid gap-2 d-md-flex justify-content-md-center">
+              <Button
+                variant="danger"
+                size="lg"
+                onClick={handleSavePicks}
+                disabled={isSaving || !bracketGeneratedFromPools}
+                className="mb-2 mb-md-0 me-md-2"
+              >
+                {isSaving ? (
+                  <>
+                    <Spinner as="span" animation="border" size="sm" /> Saving
+                    Master...
+                  </>
+                ) : (
+                  'Save Master Results'
+                )}
+              </Button>
+              <Button
+                variant="outline-danger"
+                size="lg"
+                onClick={handleDeleteMasterBracket}
+                disabled={isSaving}
+              >
+                Delete Master Bracket
+              </Button>
+            </div>
+          </Card.Body>
+        </Card>
+      ) : !viewOnlyUserId ? ( // User's own bracket controls
         <Card className="mb-4">
           <Card.Header>My Bracket Controls</Card.Header>
           <Card.Body>
@@ -1085,10 +1101,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                     variant="success"
                     onClick={handleSavePicks}
                     disabled={
-                      isSaving ||
-                      !bracketGeneratedFromPools ||
-                      (!isMasterBracket && isLocked) ||
-                      (!isMasterBracket && !isEditing && !isViewingSomeoneElse)
+                      isSaving || !bracketGeneratedFromPools || isLocked
                     }
                     className="w-100"
                   >
@@ -1101,39 +1114,26 @@ const TournamentView: React.FC<TournamentViewProps> = ({
                       'Save Picks & Name'
                     )}
                   </Button>
-                  {isMasterBracket && (
-                    <Button
-                      variant="outline-danger"
-                      size="lg"
-                      onClick={handleDeleteMasterBracket}
-                      disabled={isSaving} // Disable if another operation is in progress
-                    >
-                      Delete Master Bracket
-                    </Button>
-                  )}
                 </Col>
               )}
             </Row>
-            {!isMasterBracket &&
-              !isEditing &&
-              !isLocked &&
-              user?.uid === effectiveUserIdForUserBracket && (
-                <Button
-                  variant="info"
-                  onClick={() => setIsEditing(true)}
-                  className="mt-3"
-                >
-                  Edit Bracket
-                </Button>
-              )}
-            {isLocked && !isViewingSomeoneElse && (
+            {!isEditing && !isLocked && (
+              <Button
+                variant="info"
+                onClick={() => setIsEditing(true)}
+                className="mt-3"
+              >
+                Edit Bracket
+              </Button>
+            )}
+            {isLocked && (
               <Alert variant="warning" className="mt-3">
                 Bracket is locked. No more edits allowed.
               </Alert>
             )}
           </Card.Body>
         </Card>
-      )}
+      ) : null}
 
       {!isMasterBracket && (
         <Row className="mb-4 text-center">
@@ -1148,14 +1148,25 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           <Col md={4}>
             <Card bg="light">
               <Card.Header>
-                {isViewingSomeoneElse
+                {viewOnlyUserId
                   ? 'Bracket Score'
                   : 'Your Current Bracket Score'}
               </Card.Header>
               <Card.Body>
-                <Card.Title>
-                  {currentScore} / {MAX_POSSIBLE_POINTS}
-                </Card.Title>
+                {isLoadingMasterForScoring ? (
+                  <Spinner animation="border" size="sm" />
+                ) : (
+                  <Card.Title>
+                    {currentScore} / {maxPointsForDisplay}
+                  </Card.Title>
+                )}
+                {!masterBracketForScoring &&
+                  !isLoadingMasterForScoring &&
+                  !isMasterBracket && (
+                    <small className="text-muted d-block">
+                      Master results pending for official score.
+                    </small>
+                  )}
               </Card.Body>
             </Card>
           </Col>
@@ -1163,38 +1174,51 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             <Card bg="light">
               <Card.Header>Possible Points Remaining</Card.Header>
               <Card.Body>
-                <Card.Title>{possiblePointsRemaining}</Card.Title>
+                {isLoadingMasterForScoring ? (
+                  <Spinner animation="border" size="sm" />
+                ) : (
+                  <Card.Title>{possiblePointsRemaining}</Card.Title>
+                )}
               </Card.Body>
             </Card>
           </Col>
         </Row>
       )}
+      {isMasterBracket && (
+        <Alert variant="info" className="text-center my-3">
+          This is the master bracket. It does not lock and does not have a score
+          itself. Its state determines scores for user brackets.
+        </Alert>
+      )}
 
       <div className="bg-light py-3 mb-4 border rounded">
         <Container>
           <h3 className="text-center mb-0">Pool Play</h3>
-          {isMasterBracket &&
-            isEditing &&
-            !isLocked &&
-            !isViewingSomeoneElse && (
-              <p className="text-center text-muted mt-2 mb-0">
-                Drag and drop teams to reorder pools.
-                {!bracketGeneratedFromPools &&
-                  ' Then, populate the bracket using the button below.'}
-                {bracketGeneratedFromPools &&
-                  ' Pool order changed, re-populate bracket below.'}
-              </p>
-            )}
-          {!isMasterBracket &&
-            (!isEditing || isLocked || isViewingSomeoneElse) && ( // Viewing or locked
-              <p className="text-center text-muted mt-2 mb-0">
-                Current pool rankings.
-                {!isViewingSomeoneElse &&
-                  !isLocked &&
-                  user?.uid === effectiveUserIdForUserBracket &&
-                  ' Click "Edit Bracket" to make changes.'}
-              </p>
-            )}
+          {isMasterBracket && isEditing && (
+            <p className="text-center text-muted mt-2 mb-0">
+              Drag and drop teams to reorder pools for Master Results.
+              {!bracketGeneratedFromPools && ' Then, populate the bracket.'}
+              {bracketGeneratedFromPools &&
+                ' Pool order changed, re-populate bracket.'}
+            </p>
+          )}
+          {!isMasterBracket && isEditing && !isLocked && !viewOnlyUserId && (
+            <p className="text-center text-muted mt-2 mb-0">
+              Drag and drop teams to reorder pools.
+              {!bracketGeneratedFromPools &&
+                ' Then, populate the bracket using the button below.'}
+              {bracketGeneratedFromPools &&
+                ' Pool order changed, re-populate bracket below.'}
+            </p>
+          )}
+          {!isMasterBracket && (!isEditing || isLocked || viewOnlyUserId) && (
+            <p className="text-center text-muted mt-2 mb-0">
+              Current pool rankings.
+              {!viewOnlyUserId &&
+                !isLocked &&
+                ' Click "Edit Bracket" to make changes.'}
+            </p>
+          )}
         </Container>
       </div>
       {renderPoolStandings()}
@@ -1203,30 +1227,44 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         <div className="bg-light py-3 mb-4 border rounded">
           <Container>
             <h3 className="text-center mb-0">Bracket Play</h3>
-            {isEditing &&
+            {isMasterBracket && isEditing && !bracketGeneratedFromPools && (
+              <p className="text-center text-muted mt-2 mb-0">
+                Populate master bracket from pool rankings to set results.
+              </p>
+            )}
+            {isMasterBracket && isEditing && bracketGeneratedFromPools && (
+              <p className="text-center text-muted mt-2 mb-0">
+                Click teams to set master results.
+              </p>
+            )}
+            {!isMasterBracket &&
+              isEditing &&
               !isLocked &&
-              !isViewingSomeoneElse &&
+              !viewOnlyUserId &&
               !bracketGeneratedFromPools && (
                 <p className="text-center text-muted mt-2 mb-0">
                   Populate bracket from pool rankings to make picks.
                 </p>
               )}
-            {isEditing &&
+            {!isMasterBracket &&
+              isEditing &&
               !isLocked &&
-              !isViewingSomeoneElse &&
+              !viewOnlyUserId &&
               bracketGeneratedFromPools && (
                 <p className="text-center text-muted mt-2 mb-0">
                   Click teams to advance them. Save picks with "Save Picks &
                   Name".
                 </p>
               )}
-            {(!isEditing || isLocked || isViewingSomeoneElse) &&
+            {!isMasterBracket &&
+              (!isEditing || isLocked || viewOnlyUserId) &&
               !bracketGeneratedFromPools && (
                 <p className="text-center text-muted mt-2 mb-0">
                   Bracket not yet populated from pools.
                 </p>
               )}
-            {(!isEditing || isLocked || isViewingSomeoneElse) &&
+            {!isMasterBracket &&
+              (!isEditing || isLocked || viewOnlyUserId) &&
               bracketGeneratedFromPools && (
                 <p className="text-center text-muted mt-2 mb-0">
                   Current bracket picks.
@@ -1238,7 +1276,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           renderBracket()
         ) : (
           <Alert variant="info" className="text-center">
-            {isEditing && !isLocked && !isViewingSomeoneElse
+            {(isMasterBracket && isEditing) ||
+            (!isMasterBracket && isEditing && !isLocked && !viewOnlyUserId)
               ? 'Please complete pool rankings and click "Populate Bracket from Pool Rankings" above to view and interact with the bracket.'
               : 'Bracket will be displayed once populated from pool rankings.'}
           </Alert>

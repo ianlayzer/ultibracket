@@ -1,5 +1,5 @@
 import { Container } from 'react-bootstrap';
-import TournamentView from '../components/Tournament'; // Adjust path as needed
+import TournamentView from '../components/TournamentView'; // Adjust path as needed
 
 const MASTER_TOURNAMENT_ID = 'MASTER_BRACKET_USAU_2025';
 
