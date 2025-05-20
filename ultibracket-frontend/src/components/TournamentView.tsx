@@ -290,8 +290,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   const [countdown, setCountdown] = useState<string>('');
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [currentScore, setCurrentScore] = useState<number>(0);
-  const [possiblePointsRemaining, setPossiblePointsRemaining] =
-    useState<number>(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
+  // const [possiblePointsRemaining, setPossiblePointsRemaining] =
+  //   useState<number>(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
   const [maxPointsForDisplay, setMaxPointsForDisplay] = useState<number>(
     MAX_POSSIBLE_POINTS_NEW_SYSTEM,
   );
@@ -443,16 +443,16 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       // setPossiblePointsRemaining(dynamicPossible);
 
       // Using the current simpler version from calculateBracketScoresAgainstMaster:
-      setPossiblePointsRemaining(scores.possiblePointsRemaining);
+      // setPossiblePointsRemaining(scores.possiblePointsRemaining);
       setMaxPointsForDisplay(scores.maxPoints);
     } else if (isMasterBracket) {
       setCurrentScore(0);
-      setPossiblePointsRemaining(0);
+      // setPossiblePointsRemaining(0);
       setMaxPointsForDisplay(0);
     } else {
       // Fallback or still loading master
       setCurrentScore(0);
-      setPossiblePointsRemaining(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
+      // setPossiblePointsRemaining(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
       setMaxPointsForDisplay(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
     }
   }, [
@@ -666,15 +666,15 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         masterBracketForScoring,
       );
       setCurrentScore(scores.currentScore);
-      setPossiblePointsRemaining(scores.possiblePointsRemaining);
+      // setPossiblePointsRemaining(scores.possiblePointsRemaining);
       setMaxPointsForDisplay(scores.maxPoints);
     } else if (isMasterBracket) {
       setCurrentScore(0);
-      setPossiblePointsRemaining(0);
+      // setPossiblePointsRemaining(0);
       setMaxPointsForDisplay(0);
     } else {
       setCurrentScore(0);
-      setPossiblePointsRemaining(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
+      // setPossiblePointsRemaining(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
       setMaxPointsForDisplay(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
     }
   }, [
