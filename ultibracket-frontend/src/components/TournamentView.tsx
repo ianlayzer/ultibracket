@@ -10,6 +10,7 @@ import {
   ToastContainer,
   Form,
   Alert,
+  Modal,
 } from 'react-bootstrap';
 import { useState, useEffect, useMemo } from 'react';
 import './Tournament.css';
@@ -290,6 +291,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
   const [countdown, setCountdown] = useState<string>('');
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [currentScore, setCurrentScore] = useState<number>(0);
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   // const [possiblePointsRemaining, setPossiblePointsRemaining] =
   //   useState<number>(MAX_POSSIBLE_POINTS_NEW_SYSTEM);
   const [maxPointsForDisplay, setMaxPointsForDisplay] = useState<number>(
@@ -959,6 +961,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
     }
     setIsSaving(true);
     setSaveMessage(null);
+    setShowSuccessModal(false); // Ensure modal is hidden initially if re-saving
     const dataToSave: FirebaseTournamentType = {
       name: tournamentData.name,
       pools: tournamentData.pools,
@@ -986,6 +989,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           `Bracket "${userBracketName}" for ${currentDivision} division saved successfully!`,
         );
         setIsEditing(false);
+        setShowSuccessModal(true); // <--- SHOW THE MODAL ON SUCCESS
       } else {
         throw new Error('Cannot determine save type or user missing.');
       }
@@ -1627,6 +1631,57 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           <Toast.Body className="text-white">{saveMessage}</Toast.Body>
         </Toast>
       </ToastContainer>
+      {!isMasterBracket && (
+        <Modal
+          show={showSuccessModal}
+          onHide={() => setShowSuccessModal(false)}
+          centered
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>🎉 Bracket Saved! 🎉</Modal.Title>
+          </Modal.Header>
+          <Modal.Body className="text-center">
+            <h4>
+              Thanks for playing,{' '}
+              {user?.displayName || user?.email || 'Bracket Master'}!
+            </h4>
+            <p>
+              Your picks for the {currentDivision} division have been
+              successfully saved.
+            </p>
+            <p>Share the fun with your friends!</p>
+            <Button
+              variant="primary"
+              onClick={() => {
+                navigator.clipboard
+                  .writeText('https://ultibracket.com')
+                  .then(() => {
+                    alert('Link copied to clipboard!');
+                  })
+                  .catch((err) => {
+                    console.error('Failed to copy link: ', err);
+                    alert(
+                      'Failed to copy link. Please copy it manually: https://ultibracket.com',
+                    );
+                  });
+              }}
+              className="mt-2"
+            >
+              <i className="bi bi-clipboard-check me-2"></i>{' '}
+              {/* Optional: Bootstrap Icon */}
+              Copy Site Link
+            </Button>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowSuccessModal(false)}
+            >
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
     </Container>
   );
 };
