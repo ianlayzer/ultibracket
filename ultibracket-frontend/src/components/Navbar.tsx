@@ -37,9 +37,16 @@ const Navbar = () => {
             <Nav.Link as={Link} to="/leaderboard">
               Leaderboard
             </Nav.Link>
-            {user && (
+            {user ? (
               <Nav.Link as={Link} to="/my-bracket">
                 My Bracket
+              </Nav.Link>
+            ) : (
+              <Nav.Link
+                onClick={handleGoogleLogin}
+                style={{ cursor: 'pointer' }}
+              >
+                Make a Bracket!
               </Nav.Link>
             )}
             <Nav.Link as={Link} to="/scoring">
