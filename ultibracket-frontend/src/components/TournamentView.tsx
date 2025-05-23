@@ -600,7 +600,7 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       return;
     }
     const calculateCountdown = () => {
-      const lockDate = new Date('2025-05-23T17:30:00Z');
+      const lockDate = new Date('2025-05-23T19:30:00Z');
       const now = new Date();
       const diff = lockDate.getTime() - now.getTime();
       if (diff <= 0) {
