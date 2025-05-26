@@ -1209,10 +1209,11 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           }
         }
 
-        if (isImpossible) {
-          team1Classes += ' team-impossible';
-          team1PointsDisplay = '+0';
-        } else if (currentRoundMasterConfirmedTeams?.has(userGame.team1)) {
+        // if (isImpossible) {
+        //   team1Classes += ' team-impossible';
+        //   team1PointsDisplay = '+0';
+        // } else
+        if (currentRoundMasterConfirmedTeams?.has(userGame.team1)) {
           team1Classes += ' team-correct-slot';
           team1PointsDisplay = `+${SCORING_RULES_ROUND_NAMES[roundName.toUpperCase() as keyof typeof SCORING_RULES_ROUND_NAMES]}`;
           if (
@@ -1222,6 +1223,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           ) {
             team1PointsDisplay = `+${SCORING_RULES_ROUND_NAMES.FINALS + SCORING_RULES_ROUND_NAMES.CHAMPION}`;
             team1Classes += ' team-correct-pick';
+          } else if (roundName === 'final') {
+            team1PointsDisplay = `+${SCORING_RULES_ROUND_NAMES.FINALS}`;
           } else if (
             userWinner === userGame.team1 &&
             masterGame?.winner === userGame.team1
@@ -1248,10 +1251,11 @@ const TournamentView: React.FC<TournamentViewProps> = ({
             }
           }
         }
-        if (isImpossible) {
-          team2Classes += ' team-impossible';
-          team2PointsDisplay = '+0';
-        } else if (currentRoundMasterConfirmedTeams?.has(userGame.team2)) {
+        // if (isImpossible) {
+        //   team2Classes += ' team-impossible';
+        //   team2PointsDisplay = '+0';
+        // } else
+        if (currentRoundMasterConfirmedTeams?.has(userGame.team2)) {
           team2Classes += ' team-correct-slot';
           team2PointsDisplay = `+${SCORING_RULES_ROUND_NAMES[roundName.toUpperCase() as keyof typeof SCORING_RULES_ROUND_NAMES]}`;
           if (
@@ -1261,6 +1265,8 @@ const TournamentView: React.FC<TournamentViewProps> = ({
           ) {
             team2PointsDisplay = `+${SCORING_RULES_ROUND_NAMES.FINALS + SCORING_RULES_ROUND_NAMES.CHAMPION}`;
             team2Classes += ' team-correct-pick';
+          } else if (roundName === 'final') {
+            team2PointsDisplay = `+${SCORING_RULES_ROUND_NAMES.FINALS}`;
           } else if (
             userWinner === userGame.team2 &&
             masterGame?.winner === userGame.team2
