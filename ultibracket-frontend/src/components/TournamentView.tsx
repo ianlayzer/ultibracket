@@ -1195,19 +1195,18 @@ const TournamentView: React.FC<TournamentViewProps> = ({
         masterConfirmedData.completedRounds?.has(roundName);
 
       if (userGame.team1 && userGame.team1 !== 'TBD') {
-        let isImpossible = false;
-        if (roundName !== 'prequarters') {
-          for (const prevRound of ROUND_ORDER) {
-            if (prevRound === roundName) break;
-            if (
-              masterConfirmedData.completedRounds?.has(prevRound) &&
-              !masterConfirmedData.teamsByRound[prevRound]?.has(userGame.team1)
-            ) {
-              isImpossible = true;
-              break;
-            }
-          }
-        }
+        // if (roundName !== 'prequarters') {
+        //   for (const prevRound of ROUND_ORDER) {
+        //     if (prevRound === roundName) break;
+        //     if (
+        //       masterConfirmedData.completedRounds?.has(prevRound) &&
+        //       !masterConfirmedData.teamsByRound[prevRound]?.has(userGame.team1)
+        //     ) {
+        //       isImpossible = true;
+        //       break;
+        //     }
+        //   }
+        // }
 
         // if (isImpossible) {
         //   team1Classes += ' team-impossible';
@@ -1238,19 +1237,19 @@ const TournamentView: React.FC<TournamentViewProps> = ({
       }
 
       if (userGame.team2 && userGame.team2 !== 'TBD') {
-        let isImpossible = false;
-        if (roundName !== 'prequarters') {
-          for (const prevRound of ROUND_ORDER) {
-            if (prevRound === roundName) break;
-            if (
-              masterConfirmedData.completedRounds?.has(prevRound) &&
-              !masterConfirmedData.teamsByRound[prevRound]?.has(userGame.team2)
-            ) {
-              isImpossible = true;
-              break;
-            }
-          }
-        }
+        // let isImpossible = false;
+        // if (roundName !== 'prequarters') {
+        //   for (const prevRound of ROUND_ORDER) {
+        //     if (prevRound === roundName) break;
+        //     if (
+        //       masterConfirmedData.completedRounds?.has(prevRound) &&
+        //       !masterConfirmedData.teamsByRound[prevRound]?.has(userGame.team2)
+        //     ) {
+        //       isImpossible = true;
+        //       break;
+        //     }
+        //   }
+        // }
         // if (isImpossible) {
         //   team2Classes += ' team-impossible';
         //   team2PointsDisplay = '+0';
